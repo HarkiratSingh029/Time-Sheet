@@ -43,6 +43,8 @@ underscore-separated: `feature/24_project_calendar`, `fix/25_login_crash_on_empt
 
 - Title: **`[Feature] #<N>: <description>`**, **`[Fix] #<N>: <description>`** or
   **`[Design] #<N>: <description>`**. The prefix must match the branch prefix.
+  **`[Epic] #<N>: <description>`** is the one exception — an epic is a tracking issue and
+  has no branch of its own; its stories carry the branches.
 - Body follows §4. Labels from §5 are applied **at creation**, not later.
 
 ### d. Make the change
@@ -95,6 +97,7 @@ that claims readiness.
 | Feature issue | `[Feature] #<N>: <description>` | `[Feature] #24: Project calendar grid` |
 | Fix issue | `[Fix] #<N>: <description>` | `[Fix] #25: Login crash on empty email` |
 | Design issue | `[Design] #<N>: <description>` | `[Design] #26: Dark mode token set` |
+| Epic issue | `[Epic] #<N>: <description>` | `[Epic] #2: EPIC 0 — Foundation` |
 | Feature branch | `feature/<N>_<snake_case>` | `feature/24_project_calendar_grid` |
 | Fix branch | `fix/<N>_<snake_case>` | `fix/25_login_crash_on_empty_email` |
 | Design branch | `design/<N>_<snake_case>` | `design/26_dark_mode_tokens` |
