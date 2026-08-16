@@ -1,0 +1,102 @@
+# ---------------------------------------------------------------------------
+# TS Timesheets — ignore rules
+# Grouped by origin so it stays readable as the stack grows.
+# ---------------------------------------------------------------------------
+
+# --- macOS / editors -------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Test / lint / type caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# --- Node ------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+
+# --- Secrets & local config ------------------------------------------------
+# Never commit real credentials. `.env.example` IS tracked as the template.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!brands/**/*.key
+secrets/
+.cloudflared/
+cert.pem
+
+# --- Runtime data (SAAS-in-a-box keeps state on disk, §12) ------------------
+# Local SQLite databases, uploaded project files and generated exports are
+# runtime state, not source. They live under data/ and never enter git.
+data/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+uploads/
+storage/
+
+# --- Logs ------------------------------------------------------------------
+logs/
+*.log
+
+# --- Build artifacts -------------------------------------------------------
+# brands/dist IS tracked on purpose: the generated token CSS is the reviewable
+# output of a [Design] ticket, and a fresh clone must render without a build step.
+# `build_all.py --check` fails when it drifts from brands/tokens/palette.json.
+frontend/static/dist/
+
+# --- Agent mirrors ---------------------------------------------------------
+# .agents/skills is generated from .claude/skills by scripts/sync-agent-skills.sh.
+.agents/skills/
