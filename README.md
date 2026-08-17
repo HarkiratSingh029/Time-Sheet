@@ -1,0 +1,101 @@
+# TS Timesheets
+
+A central timesheet application for small and medium organizations: consultants log
+time against projects, approvers sign it off, and project owners watch billability and
+project health from a dashboard.
+
+It is built to be **SAAS in a box** — one `docker compose up` gives you the whole
+product on a modest VPC, with an optional Cloudflare Tunnel as the only door to the
+outside world. No S3, no managed services, no per-seat cloud bill.
+
+---
+
+## What it does
+
+| Who | What they get |
+| --- | --- |
+| **Administrator** | The license holder and super user. Unrestricted CRUD across every object; adds users and assigns their roles. |
+| **Project owner** | Creates projects, sets budget/duration/approval rules, and reads the metrics dashboard (per project and global). |
+| **Approver** | Reviews submitted time notes for the projects they approve — up to five approvals per project. |
+| **Consultant** | Opens a project calendar, double-clicks a date, and logs a time note with duration and detail. |
+
+The unit of work is a **time note**: a consultant's entry for one day on one project.
+Time notes flow `draft → submitted → approved/rejected`, and the dashboard aggregates
+them into billability, burn-down and project health (green / amber / red).
+
+---
+
+## Repository layout
+
+```
+backend/          FastAPI application — API, auth, workflow engine, persistence
+frontend/         Jinja templates + vanilla JS/CSS served by the backend (no build step)
+brands/           Brand toolkit: design tokens, palette, generated CSS. Owned by [Design] tickets.
+docs/             Architecture, data model, roadmap, epic planning
+scripts/          Repo gates and utilities (frontend check, skill mirroring)
+tests/            Pytest suite — consolidated, few and meaningful (§4.7 of CHANGE_MANAGEMENT.md)
+.claude/skills/   Agent skills that encode this project's conventions
+```
+
+---
+
+## Getting started
+
+Prerequisites: **Python 3.12+** and **Node 20+**. Docker is optional for local dev and
+required only for the container path.
+
+```bash
+git clone https://github.com/HarkiratSingh029/Time-Sheet.git
+cd Time-Sheet
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+uvicorn backend.app.main:app --reload
+```
+
+The app is then on <http://127.0.0.1:8000>.
+
+Docker path (once EPIC 0 lands the image):
+
+```bash
+docker compose up --build          # normal launch
+docker compose down -v && docker compose up --build   # fresh, clean launch
+```
+
+---
+
+## The gates
+
+Every change must be green on these before a PR is opened:
+
+```bash
+pytest                              # backend behaviour
+ruff check .                        # lint
+node scripts/check-frontend.mjs     # any frontend change
+python3 brands/scripts/build_all.py # any [Design] / brands change
+```
+
+---
+
+## How we work
+
+Read **[CHANGE_MANAGEMENT.md](CHANGE_MANAGEMENT.md)** before your first change. In short:
+
+- Branch from `develop`, never from `main`.
+- One issue → one branch → one PR. Branch and issue numbers match.
+- `[Feature]` / `[Fix]` / `[Design]` prefixes are shared by the issue, the branch and the PR.
+- Gates green and scope complete → push and open the PR to `develop` without being asked.
+
+Design work follows **[BRAND_GUIDELINES.md](BRAND_GUIDELINES.md)** — the Clean Navy &
+Mint palette in light mode, Ocean Depth in dark mode.
+
+---
+
+## Roadmap
+
+Planning lives in **[docs/ROADMAP.md](docs/ROADMAP.md)**:
+
+- **EPIC 0 — Foundation.** The first running version: auth, users, projects, time notes, a single approval, and a deployable container.
+- **EPIC 1 — Workflow & approvals.** Roles, multi-approver chains, the full time-note lifecycle.
+- **EPIC 2 — Insight.** Project and global dashboards, metrics, health, project files.
+- **EPIC 3 — Operations.** Hardening, deployment, Cloudflare Tunnel, backups, admin tooling.

@@ -1,0 +1,96 @@
+{
+  "$schema": "./palette.schema.json",
+  "brand": "TS Timesheets",
+  "version": "1.0.0",
+  "themes": {
+    "light": {
+      "name": "Clean Navy & Mint",
+      "colors": {
+        "primary": "#000055",
+        "secondary": "#556B7D",
+        "tertiary": "#98DDCA",
+        "accent": "#00BCD4",
+        "background": "#FAFAFA",
+        "surface": "#FFFFFF",
+        "surface-muted": "#F1F4F7",
+        "border": "#DCE3EA",
+        "text-heading": "#000055",
+        "text-body": "#333333",
+        "text-muted": "#556B7D",
+        "text-on-primary": "#FFFFFF"
+      }
+    },
+    "dark": {
+      "name": "Ocean Depth",
+      "colors": {
+        "primary": "#38BDF8",
+        "secondary": "#CBD5E1",
+        "tertiary": "#34D399",
+        "accent": "#38BDF8",
+        "background": "#101626",
+        "surface": "#1E293B",
+        "surface-muted": "#182236",
+        "border": "#2C3B52",
+        "text-heading": "#FFFFFF",
+        "text-body": "#CBD5E1",
+        "text-muted": "#94A3B8",
+        "text-on-primary": "#101626"
+      }
+    }
+  },
+  "semantic": {
+    "light": {
+      "state-approved": "#2E9E7B",
+      "state-pending": "#C98A00",
+      "state-rejected": "#C1372F",
+      "state-draft": "#556B7D",
+      "health-green": "#2E9E7B",
+      "health-amber": "#C98A00",
+      "health-red": "#C1372F"
+    },
+    "dark": {
+      "state-approved": "#34D399",
+      "state-pending": "#FBBF24",
+      "state-rejected": "#F87171",
+      "state-draft": "#94A3B8",
+      "health-green": "#34D399",
+      "health-amber": "#FBBF24",
+      "health-red": "#F87171"
+    }
+  },
+  "typography": {
+    "font-sans": "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    "font-mono": "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+    "scale": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.375rem",
+      "2xl": "1.75rem",
+      "3xl": "2.25rem"
+    }
+  },
+  "space": {
+    "1": "0.25rem",
+    "2": "0.5rem",
+    "3": "0.75rem",
+    "4": "1rem",
+    "6": "1.5rem",
+    "8": "2rem",
+    "12": "3rem"
+  },
+  "radius": {
+    "sm": "4px",
+    "md": "8px",
+    "lg": "14px",
+    "pill": "999px"
+  },
+  "contrast_requirements": [
+    { "fg": "text-body", "bg": "background", "min_ratio": 4.5 },
+    { "fg": "text-body", "bg": "surface", "min_ratio": 4.5 },
+    { "fg": "text-heading", "bg": "background", "min_ratio": 4.5 },
+    { "fg": "text-muted", "bg": "surface", "min_ratio": 3.0 },
+    { "fg": "text-on-primary", "bg": "primary", "min_ratio": 4.5 }
+  ]
+}
