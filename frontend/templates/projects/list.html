@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Projects — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>Projects</h1>
+    <p class="page__lede">
+      {% if projects %}
+        {{ projects|length }} project{{ '' if projects|length == 1 else 's' }} you can see.
+      {% else %}
+        Nothing here yet.
+      {% endif %}
+    </p>
+  </div>
+  {% if can_create %}
+    <a class="button button--primary" href="/projects/new">New project</a>
+  {% endif %}
+</div>
+
+{% if projects %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Code</th>
+          <th scope="col">Name</th>
+          <th scope="col">Status</th>
+          <th scope="col">Owner</th>
+          <th scope="col">Starts</th>
+          <th scope="col">Ends</th>
+          <th scope="col" class="numeric">Budget (h)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects %}
+          <tr>
+            <td><a href="/projects/{{ project.id }}"><code>{{ project.code }}</code></a></td>
+            <td>{{ project.name }}</td>
+            <td>{{ project.status.value|replace('_', ' ')|capitalize }}</td>
+            <td>{{ project.owner.full_name or project.owner.email }}</td>
+            <td>{{ project.start_date.strftime('%d %b %Y') }}</td>
+            <td>{{ project.end_date.strftime('%d %b %Y') if project.end_date else '—' }}</td>
+            <td class="numeric">{{ project.billable_hours_budget or '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <section class="card">
+    <h2 class="card__title">No projects yet</h2>
+    <p class="card__meta">
+      {% if can_create %}
+        Create one, then assign the consultants who will log time against it.
+      {% else %}
+        You will see a project here once an administrator assigns you to it.
+      {% endif %}
+    </p>
+  </section>
+{% endif %}
+{% endblock %}

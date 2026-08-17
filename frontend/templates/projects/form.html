@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% set editing = project is not none %}
+{% block title %}{{ 'Edit project' if editing else 'New project' }} — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>{{ 'Edit ' ~ project.code if editing else 'New project' }}</h1>
+    <p class="page__lede">
+      The calendar is bounded by these dates, so they decide which days can be logged.
+    </p>
+  </div>
+</div>
+
+{% if error %}
+  <p class="notice notice--error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form class="form" method="post"
+      action="{{ '/projects/' ~ project.id ~ '/edit' if editing else '/projects' }}">
+  <label class="field">
+    <span class="field__label">Name</span>
+    <input class="field__input" type="text" name="name" required
+           value="{{ project.name if editing else '' }}">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Code</span>
+    <input class="field__input" type="text" name="code" required maxlength="32"
+           value="{{ project.code if editing else '' }}">
+    <span class="field__hint">Short and unique, e.g. LEDGER. Stored uppercase.</span>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Description</span>
+    <textarea class="field__textarea" name="description">{{ project.description if editing else '' }}</textarea>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Owner</span>
+    <select class="field__select" name="owner_id" required>
+      {% for person in people %}
+        <option value="{{ person.id }}"
+          {{ 'selected' if editing and project.owner_id == person.id else '' }}>
+          {{ person.full_name or person.email }}
+        </option>
+      {% endfor %}
+    </select>
+    <span class="field__hint">The owner reads the metrics and manages this project.</span>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Manager</span>
+    <select class="field__select" name="manager_id">
+      <option value="">— none —</option>
+      {% for person in people %}
+        <option value="{{ person.id }}"
+          {{ 'selected' if editing and project.manager_id == person.id else '' }}>
+          {{ person.full_name or person.email }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Status</span>
+    <select class="field__select" name="status">
+      {% for choice in statuses %}
+        <option value="{{ choice.value }}"
+          {{ 'selected' if editing and project.status == choice else '' }}>
+          {{ choice.value|replace('_', ' ')|capitalize }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Start date</span>
+    <input class="field__input" type="date" name="start_date" required
+           value="{{ project.start_date.isoformat() if editing else '' }}">
+  </label>
+
+  <label class="field">
+    <span class="field__label">End date</span>
+    <input class="field__input" type="date" name="end_date"
+           value="{{ project.end_date.isoformat() if editing and project.end_date else '' }}">
+    <span class="field__hint">Leave empty for an open-ended project.</span>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Cost</span>
+    <input class="field__input" type="number" name="cost" min="0" step="0.01"
+           value="{{ project.cost if editing and project.cost is not none else '' }}">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Billable hours budget</span>
+    <input class="field__input" type="number" name="billable_hours_budget" min="0" step="1"
+           value="{{ project.billable_hours_budget if editing and project.billable_hours_budget is not none else '' }}">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Proposed duration (days)</span>
+    <input class="field__input" type="number" name="proposed_duration_days" min="0" step="1"
+           value="{{ project.proposed_duration_days if editing and project.proposed_duration_days is not none else '' }}">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Comment</span>
+    <textarea class="field__textarea" name="comment">{{ project.comment if editing else '' }}</textarea>
+  </label>
+
+  <div class="form__actions">
+    <button class="button button--primary" type="submit">
+      {{ 'Save changes' if editing else 'Create project' }}
+    </button>
+    <a class="button button--ghost"
+       href="{{ '/projects/' ~ project.id if editing else '/projects' }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

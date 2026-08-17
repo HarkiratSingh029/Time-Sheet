@@ -15,24 +15,45 @@ from backend.app.models import Role, User
 from backend.app.security import hash_password
 
 ADMINISTRATOR_ROLE = "administrator"
+MEMBER_ROLE = "member"
 
 
-def ensure_administrator_role(session: Session) -> Role:
-    role = session.scalar(select(Role).where(Role.name == ADMINISTRATOR_ROLE))
+def _ensure_role(session: Session, name: str, description: str, *, administrator: bool) -> Role:
+    role = session.scalar(select(Role).where(Role.name == name))
     if role is None:
-        role = Role(
-            name=ADMINISTRATOR_ROLE,
-            description="License holder and default super user. Unrestricted across all data.",
-            is_administrator=True,
-        )
+        role = Role(name=name, description=description, is_administrator=administrator)
         session.add(role)
         session.flush()
     return role
 
 
+def ensure_administrator_role(session: Session) -> Role:
+    return _ensure_role(
+        session,
+        ADMINISTRATOR_ROLE,
+        "License holder and default super user. Unrestricted across all data.",
+        administrator=True,
+    )
+
+
+def ensure_member_role(session: Session) -> Role:
+    """The only non-administrator role in EPIC 0.
+
+    Consultants, owners and approvers all carry it; what they may do comes from their
+    relationship to a project, not from the role. User-defined roles are EPIC 1 (#3).
+    """
+    return _ensure_role(
+        session,
+        MEMBER_ROLE,
+        "Standard user. Access follows project membership.",
+        administrator=False,
+    )
+
+
 def seed(session: Session, settings: Settings) -> User | None:
     """Create the first administrator. Returns the user when it was created, else None."""
     role = ensure_administrator_role(session)
+    ensure_member_role(session)
 
     if session.scalar(select(User).limit(1)) is not None:
         session.commit()

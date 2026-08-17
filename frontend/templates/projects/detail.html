@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{{ project.code }} — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="page__lede">
+      <code>{{ project.code }}</code> ·
+      {{ project.status.value|replace('_', ' ')|capitalize }} ·
+      {{ project.start_date.strftime('%d %b %Y') }} –
+      {{ project.end_date.strftime('%d %b %Y') if project.end_date else 'open ended' }}
+    </p>
+  </div>
+  {% if manageable %}
+    <a class="button" href="/projects/{{ project.id }}/edit">Edit project</a>
+  {% endif %}
+</div>
+
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">Details</h2>
+    <div class="table-wrap">
+      <table class="table">
+        <tbody>
+          <tr><th scope="row">Owner</th><td>{{ project.owner.full_name or project.owner.email }}</td></tr>
+          <tr><th scope="row">Manager</th><td>{{ (project.manager.full_name or project.manager.email) if project.manager else '—' }}</td></tr>
+          <tr><th scope="row">Cost</th><td class="numeric">{{ project.cost if project.cost is not none else '—' }}</td></tr>
+          <tr><th scope="row">Billable hours budget</th><td class="numeric">{{ project.billable_hours_budget or '—' }}</td></tr>
+          <tr><th scope="row">Proposed duration</th><td class="numeric">{{ project.proposed_duration_days or '—' }}</td></tr>
+          <tr><th scope="row">Approvals required</th><td class="numeric">{{ project.required_approvals }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    {% if project.description %}<p style="margin-top: var(--space-4)">{{ project.description }}</p>{% endif %}
+    {% if project.comment %}<p class="muted">{{ project.comment }}</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Members</h2>
+    <p class="card__meta">Membership is what grants access to this project's calendar.</p>
+
+    {% if project.members %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Person</th>
+              <th scope="col">Approver</th>
+              {% if manageable %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for member in project.members %}
+              <tr>
+                <td>
+                  {{ member.user.full_name or member.user.email }}
+                  {% if member.user.full_name %}<br><span class="muted">{{ member.user.email }}</span>{% endif %}
+                </td>
+                <td>{{ 'Yes' if member.is_approver else 'No' }}</td>
+                {% if manageable %}
+                  <td>
+                    <form method="post" action="/projects/{{ project.id }}/members/{{ member.id }}/remove">
+                      <button class="button button--small button--danger" type="submit">Remove</button>
+                    </form>
+                  </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nobody is assigned yet.</p>
+    {% endif %}
+
+    {% if manageable %}
+      {% if assignable %}
+        <form class="form" method="post" action="/projects/{{ project.id }}/members"
+              style="margin-top: var(--space-4)">
+          <label class="field">
+            <span class="field__label">Add someone</span>
+            <select class="field__select" name="user_id" required>
+              {% for person in assignable %}
+                <option value="{{ person.id }}">{{ person.full_name or person.email }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="field">
+            <span class="field__label">
+              <input type="checkbox" name="is_approver" value="true"> Approves time on this project
+            </span>
+          </label>
+          <div class="form__actions">
+            <button class="button button--primary" type="submit">Add member</button>
+          </div>
+        </form>
+      {% else %}
+        <p class="muted">Everyone is already on this project. <a href="/users/new">Add a person</a>.</p>
+      {% endif %}
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Tasks</h2>
+    <p class="card__meta">Every time note is logged against one of these.</p>
+
+    {% if project.tasks %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Task</th>
+              <th scope="col">Billable</th>
+              <th scope="col">State</th>
+              {% if manageable %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for task in project.tasks %}
+              <tr>
+                <td>{{ task.name }}{% if task.description %}<br><span class="muted">{{ task.description }}</span>{% endif %}</td>
+                <td>{{ 'Yes' if task.is_billable else 'No' }}</td>
+                <td>{{ 'Archived' if task.is_archived else 'Active' }}</td>
+                {% if manageable %}
+                  <td>
+                    <form method="post" action="/projects/{{ project.id }}/tasks/{{ task.id }}/archive">
+                      <input type="hidden" name="archived" value="{{ 'false' if task.is_archived else 'true' }}">
+                      <button class="button button--small" type="submit">
+                        {{ 'Restore' if task.is_archived else 'Archive' }}
+                      </button>
+                    </form>
+                  </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No tasks yet.</p>
+    {% endif %}
+
+    {% if manageable %}
+      <form class="form" method="post" action="/projects/{{ project.id }}/tasks"
+            style="margin-top: var(--space-4)">
+        <label class="field">
+          <span class="field__label">Task name</span>
+          <input class="field__input" type="text" name="name" required>
+        </label>
+        <label class="field">
+          <span class="field__label">Description</span>
+          <input class="field__input" type="text" name="description">
+        </label>
+        <label class="field">
+          <span class="field__label">
+            <input type="checkbox" name="is_billable" value="true" checked> Billable
+          </span>
+        </label>
+        <div class="form__actions">
+          <button class="button button--primary" type="submit">Add task</button>
+        </div>
+      </form>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Add a person — TS Timesheets{% endblock %}
+{% block main_class %}centred{% endblock %}
+
+{% block body %}
+<h1>Add a person</h1>
+<p class="page__lede">
+  They can sign in straight away and be assigned to projects. Invitations, editing and
+  deactivation arrive in EPIC 1.
+</p>
+
+{% if error %}
+  <p class="notice notice--error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form class="form" method="post" action="/users">
+  <label class="field">
+    <span class="field__label">Email</span>
+    <input class="field__input" type="email" name="email" required autofocus>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Full name</span>
+    <input class="field__input" type="text" name="full_name" required>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Title</span>
+    <input class="field__input" type="text" name="title">
+  </label>
+
+  <label class="field">
+    <span class="field__label">First password</span>
+    <input class="field__input" type="password" name="password" minlength="12" required>
+    <span class="field__hint">At least 12 characters. Share it with them directly.</span>
+  </label>
+
+  <div class="form__actions">
+    <button class="button button--primary" type="submit">Add person</button>
+    <a class="button button--ghost" href="/projects">Cancel</a>
+  </div>
+</form>
+{% endblock %}
