@@ -76,9 +76,15 @@ docker compose --profile tunnel up --build            # app plus the Cloudflare 
 docker compose down -v && docker compose up --build   # fresh, clean launch
 ```
 
-The tunnel sits behind a compose profile so an empty `TS_TUNNEL_TOKEN` can never start a
-half-configured `cloudflared`; enabling the profile without a token fails loudly. The
-published port binds to loopback — in production the tunnel is the only route in.
+The tunnel sits behind a compose profile, so a plain `docker compose up` never starts
+`cloudflared`. Enable it only with `TS_TUNNEL_TOKEN` set in `.env` — the token reaches
+cloudflared as `TUNNEL_TOKEN`. Without one the container refuses to run and restarts in a
+loop logging `"cloudflared tunnel run" requires the ID or name of the tunnel`; that is a
+missing token, and the app itself is unaffected.
+
+The published port binds to loopback — in production the tunnel is the only route in.
+`down -v` removes the `ts-data` volume, which is what makes it a genuinely fresh launch;
+a plain `down` keeps your data.
 
 ---
 

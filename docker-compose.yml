@@ -44,12 +44,13 @@ services:
     depends_on:
       app:
         condition: service_healthy
-    command:
-      - tunnel
-      - --no-autoupdate
-      - run
-      - --token
-      - ${TS_TUNNEL_TOKEN:?TS_TUNNEL_TOKEN must be set to run the tunnel profile}
+    # The token arrives as TUNNEL_TOKEN, which cloudflared reads itself. A `${VAR:?...}`
+    # guard on the command line cannot be used: compose interpolates every service at
+    # parse time, profile or not, so it would break a plain `docker compose up`. With an
+    # empty token cloudflared refuses to start and says so, which is the behaviour we want.
+    environment:
+      TUNNEL_TOKEN: ${TS_TUNNEL_TOKEN:-}
+    command: ["tunnel", "--no-autoupdate", "run"]
 
 volumes:
   ts-data:
