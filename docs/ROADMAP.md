@@ -7,14 +7,14 @@ stories**.
 
 | Epic | Theme | Issue | Status |
 | --- | --- | --- | --- |
-| **EPIC 0** | Foundation — a running timesheet | _#TBD_ | Planned |
-| **EPIC 1** | Roles, permissions & the approval workflow | _#TBD_ | Planned |
-| **EPIC 2** | Insight — dashboards, metrics & files | _#TBD_ | Planned |
-| **EPIC 3** | Operations — hardening, deployment & CI | _#TBD_ | Planned |
+| **EPIC 0** | Foundation — a running timesheet | [#2](https://github.com/HarkiratSingh029/Time-Sheet/issues/2) | Planned |
+| **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | Planned |
+| **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | Planned |
+| **EPIC 3** | Operations — hardening, deployment & CI | [#5](https://github.com/HarkiratSingh029/Time-Sheet/issues/5) | Planned |
 
-Stories for EPIC 0 exist as issues now, because it is next. Stories for EPICs 1–3 live as
-checklists on their epic issue and are promoted to issues when that epic starts — an issue
-opened four months before anyone reads it is a stale issue.
+Stories for EPIC 0 exist as issues (#6–#12), because it is next. Stories for EPICs 1–3
+live as checklists on their epic issue and are promoted to issues when that epic starts —
+an issue opened four months before anyone reads it is a stale issue.
 
 ---
 
@@ -27,15 +27,15 @@ consultant can log time on a calendar and have it approved. Deployable with
 **Done when** the end-to-end path — login → create project → assign → log time → submit →
 approve → see it approved — works in a fresh container, with green gates.
 
-| # | Story | Why it is in EPIC 0 |
-| --- | --- | --- |
-| 0.1 | Application skeleton, configuration and gates | Nothing else can be verified without `pytest`, `ruff` and a launchable app. |
-| 0.2 | Data layer: models, SQLite/WAL, seed | The objects in `docs/DATA_MODEL.md` made real. |
-| 0.3 | Authentication, sessions and the bootstrap administrator | Every screen is behind a login; the admin is the first user. |
-| 0.4 | UI shell, brand tokens and theme toggle | The design system enters the product once, at the shell, not per screen. |
-| 0.5 | Projects, members and tasks | A time note has nowhere to go without a project. |
-| 0.6 | Project calendar and time-note capture | The core interaction: double-click a date, log the day, submit. |
-| 0.7 | Single-approval flow, end to end | Makes the workflow real; multi-approver chains wait for EPIC 1. |
+| # | Issue | Story | Why it is in EPIC 0 |
+| --- | --- | --- | --- |
+| 0.1 | [#6](https://github.com/HarkiratSingh029/Time-Sheet/issues/6) | Application skeleton, configuration and container | Nothing else can be verified without `pytest`, `ruff` and a launchable app. |
+| 0.2 | [#7](https://github.com/HarkiratSingh029/Time-Sheet/issues/7) | Data layer: models, SQLite/WAL, seed | The objects in `docs/DATA_MODEL.md` made real. |
+| 0.3 | [#8](https://github.com/HarkiratSingh029/Time-Sheet/issues/8) | Authentication, sessions and the bootstrap administrator | Every screen is behind a login; the admin is the first user. |
+| 0.4 | [#9](https://github.com/HarkiratSingh029/Time-Sheet/issues/9) | UI shell, brand tokens and theme toggle | The design system enters the product once, at the shell, not per screen. |
+| 0.5 | [#10](https://github.com/HarkiratSingh029/Time-Sheet/issues/10) | Projects, members and tasks | A time note has nowhere to go without a project. |
+| 0.6 | [#11](https://github.com/HarkiratSingh029/Time-Sheet/issues/11) | Project calendar and time-note capture | The core interaction: double-click a date, log the day, submit. |
+| 0.7 | [#12](https://github.com/HarkiratSingh029/Time-Sheet/issues/12) | Single-approval flow, end to end | Makes the workflow real; multi-approver chains wait for EPIC 1. |
 
 **Explicitly not in EPIC 0:** user-defined roles, 2–5 approver chains, dashboards and
 metrics, file uploads, exports, notifications, CI. Each has an epic of its own.
