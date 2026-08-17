@@ -1,13 +1,79 @@
 <!doctype html>
-<html lang="en" data-theme="{{ theme|default('') }}">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}TS Timesheets{% endblock %}</title>
     <link rel="stylesheet" href="/brand/tokens.css">
     <link rel="stylesheet" href="/static/css/app.css">
+    <script>
+      // Applied before first paint: reading the stored theme from theme.js instead would
+      // render the light palette for a frame on a dark-mode machine.
+      (function () {
+        try {
+          var stored = localStorage.getItem("ts-theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+        } catch (error) {
+          /* private mode: fall back to the OS preference */
+        }
+      })();
+    </script>
   </head>
   <body>
-    {% block body %}{% endblock %}
+    <a class="skip-link" href="#content">Skip to content</a>
+
+    {% block chrome %}
+      <header class="masthead">
+        <div class="masthead__inner">
+          <a class="wordmark" href="/">
+            <span class="wordmark__mark">TS</span>
+            <span class="wordmark__name">Timesheets</span>
+          </a>
+
+          {% if user %}
+            <nav class="nav" aria-label="Primary">
+              {% for item in nav_items|default([]) %}
+                <a class="nav__link{% if item.active %} nav__link--active{% endif %}"
+                   href="{{ item.href }}"
+                   {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+              {% endfor %}
+            </nav>
+          {% endif %}
+
+          <div class="masthead__actions">
+            {% include "partials/_theme_toggle.html" %}
+
+            {% if user %}
+              <div class="user-menu">
+                <span class="user-menu__email">{{ user.email }}</span>
+                <form method="post" action="/logout">
+                  <button class="button button--ghost button--small" type="submit">Sign out</button>
+                </form>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </header>
+    {% endblock %}
+
+    <main id="content" class="{% block main_class %}page{% endblock %}">
+      {% block flashes %}
+        {% if messages %}
+          <div class="flashes">
+            {% for message in messages %}
+              <p class="notice notice--{{ message.level|default('info') }}"
+                 role="{{ 'alert' if message.level == 'error' else 'status' }}">{{ message.text }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endblock %}
+
+      {% block body %}{% endblock %}
+    </main>
+
+    <script type="module" src="/static/js/theme.js"></script>
+    {% block scripts %}{% endblock %}
   </body>
 </html>

@@ -1,15 +1,36 @@
 {% extends "base.html" %}
+{% from "partials/_components.html" import state_chip %}
 {% block title %}TS Timesheets{% endblock %}
 
 {% block body %}
-<main class="auth">
-  <h1 class="auth__wordmark">TS Timesheets</h1>
-  <p class="auth__lede">Signed in as {{ user.email }}.</p>
+<div class="page__header">
+  <div>
+    <h1>Welcome back</h1>
+    <p class="page__lede">Signed in as {{ user.email }}.</p>
+  </div>
+</div>
 
-  <p>Projects, the calendar and the approval queue arrive in the remaining EPIC 0 stories.</p>
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">What lands next</h2>
+    <p class="card__meta">
+      Projects, the calendar and the approval queue arrive in the remaining EPIC 0 stories.
+      The shell, the palette and these components are in place for them to build on.
+    </p>
+  </section>
 
-  <form method="post" action="/logout">
-    <button class="button button--primary" type="submit">Sign out</button>
-  </form>
-</main>
+  <section class="card">
+    <h2 class="card__title">Time note states</h2>
+    <p class="card__meta">
+      Every state carries a label as well as a colour, so it reads in greyscale and to a
+      colour-blind reader.
+    </p>
+    <p>
+      {{ state_chip("draft") }}
+      {{ state_chip("submitted") }}
+      {{ state_chip("approved") }}
+      {{ state_chip("rejected") }}
+    </p>
+  </section>
+</div>
 {% endblock %}

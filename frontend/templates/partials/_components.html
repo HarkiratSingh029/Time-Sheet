@@ -1,0 +1,23 @@
+{# Shared components. Import with:
+   {% from "partials/_components.html" import state_chip, health_chip %} #}
+
+{% set STATE_LABELS = {
+  "draft": "Draft",
+  "submitted": "Submitted",
+  "approved": "Approved",
+  "rejected": "Rejected",
+} %}
+
+{% macro state_chip(state) -%}
+  {%- set key = (state.value if state.value is defined else state)|string -%}
+  <span class="chip chip--{{ key }}">
+    <span class="chip__dot" aria-hidden="true"></span>{{ STATE_LABELS.get(key, key|capitalize) }}
+  </span>
+{%- endmacro %}
+
+{% macro health_chip(health) -%}
+  {%- set key = health|string -%}
+  <span class="chip chip--health-{{ key }}">
+    <span class="chip__dot" aria-hidden="true"></span>{{ key|capitalize }}
+  </span>
+{%- endmacro %}
