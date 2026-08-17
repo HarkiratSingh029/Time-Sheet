@@ -1,0 +1,134 @@
+/* TS Timesheets — component layer.
+   Every value comes from brands/dist/tokens.css. The full shell arrives in story 0.4;
+   this covers the authentication screens. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text-body);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--color-text-heading);
+  line-height: 1.2;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* --- authentication ------------------------------------------------------ */
+
+.auth {
+  max-width: 26rem;
+  margin: 0 auto;
+  padding: var(--space-12) var(--space-6);
+}
+
+.auth__wordmark {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.01em;
+}
+
+.auth__lede {
+  margin: 0 0 var(--space-8);
+  color: var(--color-text-muted);
+}
+
+.auth__form {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+/* --- fields --------------------------------------------------------------- */
+
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-heading);
+}
+
+.field__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.field__input {
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+  color: var(--color-text-body);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.field__input:focus {
+  border-color: var(--color-accent);
+}
+
+/* --- buttons -------------------------------------------------------------- */
+
+.button {
+  padding: var(--space-3) var(--space-4);
+  font: inherit;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.button--primary {
+  color: var(--color-text-on-primary);
+  background: var(--color-primary);
+}
+
+.button--primary:hover {
+  background: var(--color-accent);
+  color: var(--color-text-on-primary);
+}
+
+/* --- notices -------------------------------------------------------------- */
+
+.notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-border);
+  background: var(--color-surface-muted);
+  font-size: var(--text-sm);
+}
+
+.notice--error {
+  border-left-color: var(--color-state-rejected);
+}
+
+.notice--pending {
+  border-left-color: var(--color-state-pending);
+}

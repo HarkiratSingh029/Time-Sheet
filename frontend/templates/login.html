@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Sign in — TS Timesheets{% endblock %}
+
+{% block body %}
+<main class="auth">
+  <h1 class="auth__wordmark">TS Timesheets</h1>
+  <p class="auth__lede">Sign in to log and approve time.</p>
+
+  {% if error %}
+    <p class="notice notice--error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <form class="auth__form" method="post" action="/login">
+    <label class="field">
+      <span class="field__label">Email</span>
+      <input class="field__input" type="email" name="email" autocomplete="username" required autofocus>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Password</span>
+      <input class="field__input" type="password" name="password" autocomplete="current-password" required>
+    </label>
+
+    <button class="button button--primary" type="submit">Sign in</button>
+  </form>
+</main>
+{% endblock %}

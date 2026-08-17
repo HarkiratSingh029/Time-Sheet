@@ -49,7 +49,7 @@ The whole product is one `docker compose up`.
 | Data | **SQLite (WAL)** via SQLAlchemy | 30 users do not need a database server. WAL handles our concurrency; a single file is a single backup. |
 | Validation | **Pydantic v2** | Already in FastAPI's path; one schema layer, not two. |
 | Files | **Local volume** | No S3. Project attachments live in `data/uploads/`, backed up with the database. |
-| Auth | **Server-side sessions**, signed cookies | Simpler and safer than JWT for a first-party web app with no third-party clients. |
+| Auth | **Signed, timestamped session cookies** | Simpler and safer than JWT for a first-party web app with no third-party clients, and with no session table to store or expire. The trade-off is that a valid cookie stays valid until it ages out — server-side revocation is an EPIC 3 hardening story. |
 
 **On SQLite.** SQLAlchemy keeps Postgres a configuration change rather than a rewrite. We
 move only if a real limit shows up — concurrent write contention or a need for multiple

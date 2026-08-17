@@ -10,13 +10,16 @@ import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.config import REPO_ROOT, ConfigurationError, Settings, get_settings
 from backend.app.db import init_database
+from backend.app.deps import NotAuthenticated, PasswordChangeRequired, RequiredUser
+from backend.app.routes import auth as auth_routes
 from backend.app.seed import seed
+from backend.app.templating import templates
 
 BRAND_DIR = REPO_ROOT / "brands" / "dist"
 STATIC_DIR = REPO_ROOT / "frontend" / "static"
@@ -54,25 +57,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.mount("/brand", StaticFiles(directory=BRAND_DIR), name="brand")
 
+    @app.exception_handler(NotAuthenticated)
+    async def _unauthenticated(request: Request, _exception: NotAuthenticated) -> Response:
+        if _wants_json(request):
+            return JSONResponse(
+                {"detail": "Not authenticated"}, status_code=status.HTTP_401_UNAUTHORIZED
+            )
+        return RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    @app.exception_handler(PasswordChangeRequired)
+    async def _password_change_required(
+        request: Request, _exception: PasswordChangeRequired
+    ) -> Response:
+        if _wants_json(request):
+            return JSONResponse(
+                {"detail": "Password change required"}, status_code=status.HTTP_403_FORBIDDEN
+            )
+        return RedirectResponse("/account/password", status_code=status.HTTP_303_SEE_OTHER)
+
+    app.include_router(auth_routes.router)
+
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
     @app.get("/", response_class=HTMLResponse)
-    async def index() -> str:
-        # Placeholder until the UI shell lands in story 0.4 (#9).
-        return (
-            "<!doctype html><html><head><title>TS Timesheets</title>"
-            '<link rel="stylesheet" href="/brand/tokens.css">'
-            "<style>body{background:var(--color-background);color:var(--color-text-body);"
-            "font-family:var(--font-sans);padding:var(--space-12)}"
-            "h1{color:var(--color-text-heading)}</style></head>"
-            "<body><h1>TS Timesheets</h1>"
-            "<p>The application skeleton is running. The interface arrives in EPIC 0.4.</p>"
-            "</body></html>"
-        )
+    async def index(request: Request, user: RequiredUser) -> HTMLResponse:
+        # The shell and the real landing page arrive in story 0.4 (#9).
+        return templates.TemplateResponse(request, "index.html", {"user": user})
 
     return app
+
+
+def _wants_json(request: Request) -> bool:
+    """This is a server-rendered app: redirect by default, and answer in JSON only when
+    the caller asked for it. Sniffing for `text/html` instead would 401 every client that
+    sends `Accept: */*`, which is most of them."""
+    accept = request.headers.get("accept", "")
+    asked_for_json = "application/json" in accept and "text/html" not in accept
+    return asked_for_json or request.url.path.startswith("/api")
 
 
 def build() -> FastAPI:

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}TS Timesheets{% endblock %}
+
+{% block body %}
+<main class="auth">
+  <h1 class="auth__wordmark">TS Timesheets</h1>
+  <p class="auth__lede">Signed in as {{ user.email }}.</p>
+
+  <p>Projects, the calendar and the approval queue arrive in the remaining EPIC 0 stories.</p>
+
+  <form method="post" action="/logout">
+    <button class="button button--primary" type="submit">Sign out</button>
+  </form>
+</main>
+{% endblock %}
