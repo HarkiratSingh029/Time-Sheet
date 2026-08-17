@@ -15,6 +15,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.config import REPO_ROOT, ConfigurationError, Settings, get_settings
+from backend.app.db import init_database
+from backend.app.seed import seed
 
 BRAND_DIR = REPO_ROOT / "brands" / "dist"
 STATIC_DIR = REPO_ROOT / "frontend" / "static"
@@ -26,7 +28,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         settings.uploads_dir.mkdir(parents=True, exist_ok=True)
+
+        engine, session_factory = init_database(settings)
+        app.state.engine = engine
+        app.state.session_factory = session_factory
+
+        with session_factory() as session:
+            created = seed(session, settings)
+        if created is not None:
+            print(f"seeded bootstrap administrator: {created.email}")
+
         yield
+
+        engine.dispose()
 
     app = FastAPI(
         title="TS Timesheets",
