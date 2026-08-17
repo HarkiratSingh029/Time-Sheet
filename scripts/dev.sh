@@ -57,4 +57,4 @@ EOF
 fi
 
 echo "==> starting TS Timesheets on http://127.0.0.1:8000"
-exec uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+exec uvicorn backend.app.main:build --factory --reload --host 127.0.0.1 --port 8000
