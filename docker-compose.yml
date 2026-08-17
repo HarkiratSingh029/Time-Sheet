@@ -1,0 +1,55 @@
+# TS Timesheets — SAAS in a box.
+#
+#   docker compose up --build                      app only, reachable on localhost:8000
+#   docker compose --profile tunnel up --build     app plus the Cloudflare Tunnel
+#   docker compose down -v && docker compose up --build     fresh, clean launch
+#
+# The tunnel lives behind a profile so an empty TS_TUNNEL_TOKEN can never start a
+# half-configured cloudflared. Enabling the profile without a token fails loudly.
+
+services:
+  app:
+    build: .
+    image: ts-timesheets:local
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      TS_DATA_DIR: /app/data
+      TS_DATABASE_URL: sqlite:////app/data/app.db
+    volumes:
+      # The only stateful path: SQLite database and project uploads.
+      - ts-data:/app/data
+    ports:
+      # Bound to loopback: in production the tunnel is the only route in, and the host
+      # publishes nothing to the internet.
+      - "127.0.0.1:${TS_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          sys.exit(0 if urllib.request.urlopen("http://127.0.0.1:8000/healthz").status == 200 else 1)
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${TS_TUNNEL_TOKEN:?TS_TUNNEL_TOKEN must be set to run the tunnel profile}
+
+volumes:
+  ts-data:

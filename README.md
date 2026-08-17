@@ -28,7 +28,7 @@ them into billability, burn-down and project health (green / amber / red).
 ## Repository layout
 
 ```
-backend/          FastAPI application — API, auth, workflow engine, persistence
+backend/app/      FastAPI application — config, entry point, and (from 0.2) models and routes
 frontend/         Jinja templates + vanilla JS/CSS served by the backend (no build step)
 brands/           Brand toolkit: design tokens, palette, generated CSS. Owned by [Design] tickets.
 docs/             Architecture, data model, roadmap, epic planning
@@ -47,20 +47,38 @@ required only for the container path.
 ```bash
 git clone https://github.com/HarkiratSingh029/Time-Sheet.git
 cd Time-Sheet
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
-uvicorn backend.app.main:app --reload
+cp .env.example .env       # then set TS_SECRET_KEY
+./scripts/dev.sh           # creates .venv, installs, builds tokens, serves
 ```
 
-The app is then on <http://127.0.0.1:8000>.
+The app is then on <http://127.0.0.1:8000>, with `/healthz` as the liveness check and the
+API docs at `/api/docs` (development only).
 
-Docker path (once EPIC 0 lands the image):
+`./scripts/dev.sh --fresh` wipes `data/` first — a half-migrated local database is a worse
+debugging experience than losing a throwaway one.
+
+Doing it by hand instead:
 
 ```bash
-docker compose up --build          # normal launch
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+uvicorn backend.app.main:build --factory --reload
+```
+
+The `--factory` flag matters: the app is built by `build()` rather than created at import
+time, so a configuration error exits cleanly instead of raising during import.
+
+### Docker
+
+```bash
+docker compose up --build                             # app on 127.0.0.1:8000
+docker compose --profile tunnel up --build            # app plus the Cloudflare Tunnel
 docker compose down -v && docker compose up --build   # fresh, clean launch
 ```
+
+The tunnel sits behind a compose profile so an empty `TS_TUNNEL_TOKEN` can never start a
+half-configured `cloudflared`; enabling the profile without a token fails loudly. The
+published port binds to loopback — in production the tunnel is the only route in.
 
 ---
 
