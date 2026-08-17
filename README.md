@@ -28,7 +28,7 @@ them into billability, burn-down and project health (green / amber / red).
 ## Repository layout
 
 ```
-backend/app/      FastAPI application — config, entry point, and (from 0.2) models and routes
+backend/app/      FastAPI application — config, entry point, models, database, seeding
 frontend/         Jinja templates + vanilla JS/CSS served by the backend (no build step)
 brands/           Brand toolkit: design tokens, palette, generated CSS. Owned by [Design] tickets.
 docs/             Architecture, data model, roadmap, epic planning

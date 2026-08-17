@@ -90,8 +90,11 @@ database.
 ```
 Role ──< User ──< TimeNote >── Task >── Project >── ProjectFile
                      │                     │
-                     └──< Approval         └──< ProjectMember (user ↔ project, with role)
+                     └──< Approval         └──< ProjectMember (user ↔ project)
 ```
+
+`ProjectMember` carries an `is_approver` flag: who signs off time notes on this project.
+EPIC 0 uses a single approver; the sequenced chain of up to five arrives in EPIC 1.
 
 - A user has one role; a role has many users.
 - A user is assigned to many projects through `ProjectMember`; a project has many members.
