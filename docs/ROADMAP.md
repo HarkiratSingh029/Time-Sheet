@@ -8,13 +8,13 @@ stories**.
 | Epic | Theme | Issue | Status |
 | --- | --- | --- | --- |
 | **EPIC 0** | Foundation — a running timesheet | [#2](https://github.com/HarkiratSingh029/Time-Sheet/issues/2) | **Complete** |
-| **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | Planned |
+| **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | **In progress** |
 | **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | Planned |
 | **EPIC 3** | Operations — hardening, deployment & CI | [#5](https://github.com/HarkiratSingh029/Time-Sheet/issues/5) | Planned |
 
-Stories for EPIC 0 exist as issues (#6–#12) and are all merged. Stories for EPICs 1–3
-live as checklists on their epic issue and are promoted to issues when that epic starts —
-an issue opened four months before anyone reads it is a stale issue.
+Stories are promoted from a checklist on their epic to real issues when that epic starts —
+an issue opened four months before anyone reads it is a stale issue. EPIC 0's stories
+(#6–#12) are merged; EPIC 1's are open as #21–#27. EPICs 2 and 3 remain checklists.
 
 ---
 
@@ -52,15 +52,15 @@ metrics, file uploads, exports, notifications, CI. Each has an epic of its own.
 **Goal:** the workflow described in `docs/DATA_MODEL.md` §3, in full — user-defined roles,
 up to five approvers per project, and a time-note lifecycle a team can actually operate.
 
-| # | Story |
-| --- | --- |
-| 1.1 | Role and permission model — user-defined roles beyond `administrator` |
-| 1.2 | Administrator user management: invite, edit, deactivate, assign roles |
-| 1.3 | Per-project approval rules with 1–5 approvers, sequenced |
-| 1.4 | Approver queue: filter, bulk approve, mandatory rejection comment |
-| 1.5 | Time-note lifecycle: edit, withdraw, reopen, with an audit trail |
-| 1.6 | Notifications: in-app badges and a daily email digest for pending approvals |
-| 1.7 | Week view and bulk entry: copy last week, fill a range |
+| # | Issue | Story |
+| --- | --- | --- |
+| 1.1 | [#21](https://github.com/HarkiratSingh029/Time-Sheet/issues/21) | Role and permission model — user-defined roles beyond `administrator` |
+| 1.2 | [#22](https://github.com/HarkiratSingh029/Time-Sheet/issues/22) | Administrator user management: invite, edit, deactivate, assign roles |
+| 1.3 | [#23](https://github.com/HarkiratSingh029/Time-Sheet/issues/23) | Per-project approval rules with 1–5 approvers, sequenced |
+| 1.4 | [#24](https://github.com/HarkiratSingh029/Time-Sheet/issues/24) | Approver queue: filter, bulk approve, mandatory rejection comment |
+| 1.5 | [#25](https://github.com/HarkiratSingh029/Time-Sheet/issues/25) | Time-note lifecycle: edit, withdraw, reopen, with an audit trail |
+| 1.6 | [#26](https://github.com/HarkiratSingh029/Time-Sheet/issues/26) | Notifications: in-app badges and a daily email digest for pending approvals |
+| 1.7 | [#27](https://github.com/HarkiratSingh029/Time-Sheet/issues/27) | Week view and bulk entry: copy last week, fill a range |
 
 ---
 
