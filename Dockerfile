@@ -18,6 +18,9 @@ RUN mkdir -p backend && touch backend/__init__.py && pip install --no-cache-dir 
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY brands/ brands/
+# The app runs `alembic upgrade head` at startup, so the revisions ship with it.
+COPY alembic.ini ./
+COPY migrations/ migrations/
 
 # The image runs as a non-root user; data/ is a mounted volume it must be able to write.
 RUN useradd --create-home --uid 10001 timesheets \

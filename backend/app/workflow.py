@@ -17,6 +17,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.access import can_decide_anywhere
 from backend.app.models import (
     Approval,
     ApprovalDecision,
@@ -80,8 +81,8 @@ def submit(session: Session, note: TimeNote) -> None:
 
 
 def can_decide(session: Session, user: User, note: TimeNote) -> bool:
-    """An administrator may decide anywhere; otherwise you must hold a row on this note."""
-    if user.role.is_administrator:
+    """`approval.decide_any` reaches everywhere; otherwise you must hold a row on this note."""
+    if can_decide_anywhere(user):
         return True
     return any(approval.approver_id == user.id for approval in note.approvals)
 
@@ -124,7 +125,7 @@ def pending_notes_for(session: Session, user: User) -> list[TimeNote]:
             Approval.decision == ApprovalDecision.PENDING,
         )
     )
-    if not user.role.is_administrator:
+    if not can_decide_anywhere(user):
         query = query.where(Approval.approver_id == user.id)
 
     return list(session.scalars(query.order_by(TimeNote.work_date, TimeNote.id).distinct()).all())
@@ -146,7 +147,7 @@ def _open_approval_for(session: Session, user: User, note: TimeNote) -> Approval
     for approval in sorted(note.approvals, key=lambda row: row.sequence):
         if approval.decision is not ApprovalDecision.PENDING:
             continue
-        if approval.approver_id == user.id or user.role.is_administrator:
+        if approval.approver_id == user.id or can_decide_anywhere(user):
             return approval
 
     raise WorkflowError("You are not an approver on this entry.")

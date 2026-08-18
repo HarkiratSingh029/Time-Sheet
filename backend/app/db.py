@@ -12,14 +12,24 @@ from collections.abc import Iterator
 from pathlib import Path
 from sqlite3 import Connection as SQLiteConnection
 
+from alembic import command
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
 from fastapi import Request
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
 from backend.app.config import REPO_ROOT, Settings
-from backend.app.models import Base, Project, Task, TimeNote
+from backend.app.models import Project, Task, TimeNote
 
 SQLITE_PREFIX = "sqlite:///"
+
+ALEMBIC_INI = REPO_ROOT / "alembic.ini"
+
+# The revision describing the schema as EPIC 0 shipped it, before Alembic existed. A
+# database created by the old `create_all` matches this exactly, so it is stamped here and
+# then upgraded rather than rebuilt.
+EPIC_0_BASELINE = "da2d3ed4245c"
 
 
 class InvariantError(ValueError):
@@ -105,9 +115,32 @@ def _enforce_time_note_invariants(session: Session, _context: object, _instances
             )
 
 
+def alembic_config(url: str) -> Config:
+    config = Config(str(ALEMBIC_INI))
+    config.set_main_option("script_location", str(REPO_ROOT / "migrations"))
+    config.set_main_option("sqlalchemy.url", url)
+    return config
+
+
+def _needs_stamping(engine: Engine) -> bool:
+    """True for a pre-Alembic database: it has our tables but no revision recorded."""
+    with engine.connect() as connection:
+        if MigrationContext.configure(connection).get_current_revision() is not None:
+            return False
+        return inspect(engine).has_table("roles")
+
+
+def migrate(engine: Engine, url: str) -> None:
+    config = alembic_config(url)
+    if _needs_stamping(engine):
+        command.stamp(config, EPIC_0_BASELINE)
+    command.upgrade(config, "head")
+
+
 def init_database(settings: Settings) -> tuple[Engine, sessionmaker[Session]]:
+    url = resolve_database_url(settings.database_url)
     engine = create_db_engine(settings)
-    Base.metadata.create_all(engine)
+    migrate(engine, url)
     return engine, create_session_factory(engine)
 
 

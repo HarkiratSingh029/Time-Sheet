@@ -46,7 +46,7 @@ The whole product is one `docker compose up`.
 | API + pages | **FastAPI** on Uvicorn | One process serves the JSON API and the HTML. No second service to deploy or keep in sync. |
 | Templates | **Jinja2** | Server-rendered. No bundler, no node in the runtime image, no hydration bugs. |
 | Client JS | **Vanilla ES modules** | The calendar and dashboard need interactivity, not a framework. Served straight from `frontend/static/`. |
-| Data | **SQLite (WAL)** via SQLAlchemy | 30 users do not need a database server. WAL handles our concurrency; a single file is a single backup. |
+| Data | **SQLite (WAL)** via SQLAlchemy, migrated by **Alembic** | 30 users do not need a database server. WAL handles our concurrency; a single file is a single backup. |
 | Validation | **Pydantic v2** | Already in FastAPI's path; one schema layer, not two. |
 | Files | **Local volume** | No S3. Project attachments live in `data/uploads/`, backed up with the database. |
 | Auth | **Signed, timestamped session cookies** | Simpler and safer than JWT for a first-party web app with no third-party clients, and with no session table to store or expire. The trade-off is that a valid cookie stays valid until it ages out — server-side revocation is an EPIC 3 hardening story. |
@@ -54,6 +54,12 @@ The whole product is one `docker compose up`.
 **On SQLite.** SQLAlchemy keeps Postgres a configuration change rather than a rewrite. We
 move only if a real limit shows up — concurrent write contention or a need for multiple
 app instances — not preemptively.
+
+**On migrations.** The app runs `alembic upgrade head` at startup, so deploying is
+`docker compose up` and nothing else. A database created before Alembic existed is stamped
+at the EPIC 0 baseline and upgraded from there rather than rebuilt. `alembic check` runs in
+the test suite, because a model changed without a migration is a deploy that fails on
+somebody else's machine.
 
 **On the frontend.** The gate `node scripts/check-frontend.mjs` exists so "no build step"
 never means "no standards". It checks token usage, template hygiene and JS syntax.
