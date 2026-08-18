@@ -22,8 +22,10 @@ from backend.app.calendar_month import build_month, default_month, parse_month
 from backend.app.db import InvariantError
 from backend.app.deps import RequiredUser, SessionDep, SettingsDep
 from backend.app.flash import flash
-from backend.app.models import Project, Task, TimeNote, TimeNoteState, utcnow
+from backend.app.models import Project, Task, TimeNote, TimeNoteState
 from backend.app.templating import render
+from backend.app.workflow import WorkflowError, latest_rejection
+from backend.app.workflow import submit as submit_note
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["timesheet"])
 
@@ -58,6 +60,7 @@ async def calendar_view(
         project=project,
         month=build_month(project, year, month_number, notes, today),
         notes_json=_notes_as_json(notes),
+        rejections=_rejections(notes),
         tasks=_open_tasks(session, project),
         manageable=can_manage(user, project),
     )
@@ -139,13 +142,15 @@ async def submit_notes(
         flash(response, settings, "Nothing to submit — no drafts in that range.", "warning")
         return response
 
-    submitted_at = utcnow()
-    for note in drafts:
-        note.state = TimeNoteState.SUBMITTED
-        note.submitted_at = submitted_at
-    session.commit()
+    try:
+        for note in drafts:
+            submit_note(session, note)
+        session.commit()
+    except WorkflowError as error:
+        session.rollback()
+        flash(response, settings, str(error), "error")
+        return response
 
-    # Approvals are generated in story 0.7 (#12); submitting is the state change alone.
     flash(
         response,
         settings,
@@ -235,6 +240,24 @@ def _notes_as_json(notes) -> str:
             for note in notes
         }
     )
+
+
+def _rejections(notes) -> list[dict[str, str]]:
+    """Why a day came back, shown to its author — a rejection nobody reads is a dead end."""
+    sent_back = []
+    for note in notes:
+        if note.state is not TimeNoteState.DRAFT:
+            continue
+        rejection = latest_rejection(note)
+        if rejection is not None:
+            sent_back.append(
+                {
+                    "day": note.work_date.strftime("%d %b"),
+                    "comment": rejection.comment,
+                    "by": rejection.approver.email,
+                }
+            )
+    return sent_back
 
 
 def _open_tasks(session, project: Project) -> list[Task]:

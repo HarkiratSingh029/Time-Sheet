@@ -7,12 +7,12 @@ stories**.
 
 | Epic | Theme | Issue | Status |
 | --- | --- | --- | --- |
-| **EPIC 0** | Foundation — a running timesheet | [#2](https://github.com/HarkiratSingh029/Time-Sheet/issues/2) | Planned |
+| **EPIC 0** | Foundation — a running timesheet | [#2](https://github.com/HarkiratSingh029/Time-Sheet/issues/2) | **Complete** |
 | **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | Planned |
 | **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | Planned |
 | **EPIC 3** | Operations — hardening, deployment & CI | [#5](https://github.com/HarkiratSingh029/Time-Sheet/issues/5) | Planned |
 
-Stories for EPIC 0 exist as issues (#6–#12), because it is next. Stories for EPICs 1–3
+Stories for EPIC 0 exist as issues (#6–#12) and are all merged. Stories for EPICs 1–3
 live as checklists on their epic issue and are promoted to issues when that epic starts —
 an issue opened four months before anyone reads it is a stale issue.
 
@@ -24,8 +24,13 @@ an issue opened four months before anyone reads it is a stale issue.
 consultant can log time on a calendar and have it approved. Deployable with
 `docker compose up`.
 
-**Done when** the end-to-end path — login → create project → assign → log time → submit →
-approve → see it approved — works in a fresh container, with green gates.
+**Done.** The end-to-end path — login → create project → assign → log time → submit →
+approve → see it approved — works in a fresh container, with green gates. Covered by
+`tests/test_approvals.py::test_the_full_epic_0_path`.
+
+One addition beyond the original seven stories: an administrator can add a person
+(`/users/new`). EPIC 0 could not staff a project otherwise. The full invite, edit and
+deactivate lifecycle remains story 1.2.
 
 | # | Issue | Story | Why it is in EPIC 0 |
 | --- | --- | --- | --- |

@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import state_chip %}
+{% block title %}Approvals — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>Approvals</h1>
+    <p class="page__lede">
+      {% if notes %}
+        {{ notes|length }} entr{{ 'y' if notes|length == 1 else 'ies' }} waiting on you.
+      {% else %}
+        Nothing is waiting on you.
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+{% if notes %}
+  <div class="stack">
+    {% for note in notes %}
+      <section class="card">
+        <div class="page__header">
+          <div>
+            <h2 class="card__title">
+              {{ note.work_date.strftime('%A %d %B %Y') }} · {{ '%g'|format(note.duration_minutes / 60) }}h
+            </h2>
+            <p class="card__meta">
+              {{ note.user.full_name or note.user.email }}
+              {%- if note.user.full_name %} <span class="muted">({{ note.user.email }})</span>{% endif %} ·
+              <a href="/projects/{{ note.project_id }}"><code>{{ note.project.code }}</code></a> ·
+              {{ note.task.name }}{{ '' if note.task.is_billable else ' (non-billable)' }}
+            </p>
+          </div>
+          {{ state_chip(note.state) }}
+        </div>
+
+        {% if note.detail %}<p>{{ note.detail }}</p>{% endif %}
+
+        <div class="form__actions">
+          <form method="post" action="/approvals/{{ note.id }}/approve">
+            <button class="button button--primary" type="submit">Approve</button>
+          </form>
+
+          <form class="approval-reject" method="post" action="/approvals/{{ note.id }}/reject">
+            <label class="field">
+              <span class="visually-hidden">Reason for sending it back</span>
+              <input class="field__input" type="text" name="comment" required
+                     placeholder="What needs to change?">
+            </label>
+            <button class="button button--danger" type="submit">Send back</button>
+          </form>
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+{% else %}
+  <section class="card">
+    <h2 class="card__title">The queue is empty</h2>
+    <p class="card__meta">
+      Entries appear here once a consultant submits a day on a project you approve.
+    </p>
+  </section>
+{% endif %}
+{% endblock %}

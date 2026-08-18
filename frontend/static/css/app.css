@@ -672,3 +672,16 @@ code,
     font-size: var(--text-xs);
   }
 }
+
+/* --- approval queue ------------------------------------------------------- */
+
+.approval-reject {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  flex: 1 1 18rem;
+}
+
+.approval-reject .field {
+  flex: 1 1 auto;
+}

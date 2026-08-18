@@ -24,6 +24,7 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 NAV = [
     ("Overview", "/"),
     ("Projects", "/projects"),
+    ("Approvals", "/approvals"),
 ]
 
 
