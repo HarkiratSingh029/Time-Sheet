@@ -18,8 +18,10 @@ from backend.app.config import REPO_ROOT, ConfigurationError, Settings, get_sett
 from backend.app.db import init_database
 from backend.app.deps import NotAuthenticated, PasswordChangeRequired, RequiredUser
 from backend.app.routes import auth as auth_routes
+from backend.app.routes import projects as project_routes
+from backend.app.routes import users as user_routes
 from backend.app.seed import seed
-from backend.app.templating import templates
+from backend.app.templating import render
 
 BRAND_DIR = REPO_ROOT / "brands" / "dist"
 STATIC_DIR = REPO_ROOT / "frontend" / "static"
@@ -76,6 +78,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse("/account/password", status_code=status.HTTP_303_SEE_OTHER)
 
     app.include_router(auth_routes.router)
+    app.include_router(project_routes.router)
+    app.include_router(user_routes.router)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
@@ -83,8 +87,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request, user: RequiredUser) -> HTMLResponse:
-        # The shell and the real landing page arrive in story 0.4 (#9).
-        return templates.TemplateResponse(request, "index.html", {"user": user})
+        return render(request, "index.html", user=user)
 
     return app
 

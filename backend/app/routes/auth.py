@@ -9,7 +9,7 @@ from backend.app.auth import authenticate, clear_session, issue_session, set_pas
 from backend.app.auth import uses_bootstrap_password as still_on_bootstrap_password
 from backend.app.deps import PasswordChangeUser, SessionDep, SettingsDep, current_user
 from backend.app.security import verify_password
-from backend.app.templating import templates
+from backend.app.templating import render
 
 router = APIRouter(tags=["auth"])
 
@@ -20,7 +20,7 @@ MINIMUM_PASSWORD_LENGTH = 12
 async def login_form(request: Request, session: SessionDep, settings: SettingsDep):
     if current_user(request, session, settings) is not None:
         return RedirectResponse("/", status_code=status.HTTP_303_SEE_OTHER)
-    return templates.TemplateResponse(request, "login.html", {"error": None})
+    return render(request, "login.html", error=None)
 
 
 @router.post("/login")
@@ -33,10 +33,10 @@ async def login(
 ):
     user = authenticate(session, email, password)
     if user is None:
-        return templates.TemplateResponse(
+        return render(
             request,
             "login.html",
-            {"error": "That email and password do not match an active account."},
+            error="That email and password do not match an active account.",
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
@@ -56,14 +56,12 @@ async def logout():
 
 @router.get("/account/password", response_class=HTMLResponse)
 async def password_form(request: Request, user: PasswordChangeUser):
-    return templates.TemplateResponse(
+    return render(
         request,
         "account_password.html",
-        {
-            "user": user,
-            "error": None,
-            "forced": getattr(request.state, "must_change_password", False),
-        },
+        user=user,
+        error=None,
+        forced=getattr(request.state, "must_change_password", False),
     )
 
 
@@ -81,10 +79,12 @@ async def change_password(
 
     error = _password_problem(user.password_hash, current_password, new_password, confirm_password)
     if error is not None:
-        return templates.TemplateResponse(
+        return render(
             request,
             "account_password.html",
-            {"user": user, "error": error, "forced": forced},
+            user=user,
+            error=error,
+            forced=forced,
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
