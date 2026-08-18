@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import state_chip %}
+{% block title %}{{ project.code }} calendar — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="page__lede">
+      <a href="/projects/{{ project.id }}"><code>{{ project.code }}</code></a> ·
+      {{ project.start_date.strftime('%d %b %Y') }} –
+      {{ project.end_date.strftime('%d %b %Y') if project.end_date else 'open ended' }}
+    </p>
+  </div>
+  <form method="post" action="/projects/{{ project.id }}/notes/submit">
+    <input type="hidden" name="from_date" value="{{ month.weeks[0][0].date.isoformat() }}">
+    <input type="hidden" name="to_date" value="{{ month.weeks[-1][-1].date.isoformat() }}">
+    <input type="hidden" name="month" value="{{ month.key }}">
+    <button class="button button--primary" type="submit">Submit this month</button>
+  </form>
+</div>
+
+{% if not tasks %}
+  <p class="notice notice--warning" role="status">
+    This project has no tasks yet, so there is nothing to log time against.
+    {% if manageable %}<a href="/projects/{{ project.id }}">Add one</a>.{% endif %}
+  </p>
+{% endif %}
+
+<section class="card calendar"
+         data-calendar
+         data-project="{{ project.id }}"
+         data-month="{{ month.key }}">
+  <header class="calendar__header">
+    <div class="calendar__nav">
+      {% if month.previous %}
+        <a class="button button--small" href="?month={{ month.previous }}"
+           aria-label="Previous month">←</a>
+      {% else %}
+        <span class="button button--small" aria-disabled="true">←</span>
+      {% endif %}
+      <h2 class="calendar__title">{{ month.label }}</h2>
+      {% if month.next %}
+        <a class="button button--small" href="?month={{ month.next }}"
+           aria-label="Next month">→</a>
+      {% else %}
+        <span class="button button--small" aria-disabled="true">→</span>
+      {% endif %}
+    </div>
+    <p class="calendar__total muted">
+      {{ '%g'|format(month.total_minutes / 60) }}h logged this month
+    </p>
+  </header>
+
+  <p class="calendar__hint muted">
+    Double-click a day to log time, or focus one and press Enter.
+  </p>
+
+  <div class="calendar__grid" role="grid" aria-label="{{ month.label }}">
+    <div class="calendar__weekdays" role="row">
+      {% for weekday in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+        <span class="calendar__weekday" role="columnheader">{{ weekday }}</span>
+      {% endfor %}
+    </div>
+
+    {% for week in month.weeks %}
+      <div class="calendar__week" role="row">
+        {% for day in week %}
+          {% if day.loggable %}
+            <button type="button"
+                    class="calendar__day
+                           {%- if not day.in_month %} calendar__day--outside{% endif %}
+                           {%- if day.is_weekend %} calendar__day--weekend{% endif %}
+                           {%- if day.is_today %} calendar__day--today{% endif %}"
+                    role="gridcell"
+                    data-day="{{ day.date.isoformat() }}"
+                    data-notes="{{ day.notes|map(attribute='id')|join(',') }}"
+                    aria-label="{{ day.date.strftime('%A %d %B') }}{% if day.notes %}, {{ day.hours_label }} logged{% else %}, nothing logged{% endif %}">
+              <span class="calendar__date">{{ day.date.day }}</span>
+              {% if day.notes %}
+                <span class="calendar__hours numeric">{{ day.hours_label }}</span>
+                {{ state_chip(day.state) }}
+              {% endif %}
+            </button>
+          {% else %}
+            <div class="calendar__day calendar__day--inert" role="gridcell"
+                 aria-label="{{ day.date.strftime('%d %B') }}, outside the project">
+              <span class="calendar__date">{{ day.date.day }}</span>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+{# Every note the user owns this month, so the dialog can populate without a round trip. #}
+<script type="application/json" data-calendar-notes>{{ notes_json }}</script>
+
+<dialog class="modal" data-entry-dialog aria-labelledby="entry-title">
+  <form method="post" data-entry-form>
+    <header class="modal__header">
+      <h2 class="modal__title" id="entry-title" data-entry-heading>Log time</h2>
+    </header>
+
+    <div class="modal__body">
+      <p class="muted" data-entry-day></p>
+
+      <p class="notice notice--warning" data-entry-frozen hidden>
+        This day is already submitted, so it can no longer be changed.
+      </p>
+
+      <label class="field">
+        <span class="field__label">Task</span>
+        <select class="field__select" name="task_id" required data-entry-task>
+          {% for task in tasks %}
+            <option value="{{ task.id }}">
+              {{ task.name }}{{ '' if task.is_billable else ' (non-billable)' }}
+            </option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Hours</span>
+        <input class="field__input" type="number" name="hours" step="0.25" min="0.25" max="24"
+               required data-entry-hours>
+        <span class="field__hint">In hours — 7.5 means seven and a half.</span>
+      </label>
+
+      <label class="field">
+        <span class="field__label">What you did</span>
+        <textarea class="field__textarea" name="detail" data-entry-detail></textarea>
+      </label>
+
+      <input type="hidden" name="work_date" data-entry-date>
+      <input type="hidden" name="month" value="{{ month.key }}">
+    </div>
+
+    <footer class="modal__footer">
+      <button class="button button--ghost" type="button" data-entry-cancel>Cancel</button>
+      <button class="button button--danger" type="submit" data-entry-delete hidden
+              formaction="">Delete</button>
+      <button class="button button--primary" type="submit" data-entry-save>Save</button>
+    </footer>
+  </form>
+</dialog>
+
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/calendar.js"></script>
+{% endblock %}

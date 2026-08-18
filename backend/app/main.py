@@ -19,6 +19,7 @@ from backend.app.db import init_database
 from backend.app.deps import NotAuthenticated, PasswordChangeRequired, RequiredUser
 from backend.app.routes import auth as auth_routes
 from backend.app.routes import projects as project_routes
+from backend.app.routes import timesheet as timesheet_routes
 from backend.app.routes import users as user_routes
 from backend.app.seed import seed
 from backend.app.templating import render
@@ -79,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth_routes.router)
     app.include_router(project_routes.router)
+    app.include_router(timesheet_routes.router)
     app.include_router(user_routes.router)
 
     @app.get("/healthz")

@@ -30,6 +30,7 @@
           <th scope="col">Starts</th>
           <th scope="col">Ends</th>
           <th scope="col" class="numeric">Budget (h)</th>
+          <th scope="col"><span class="visually-hidden">Calendar</span></th>
         </tr>
       </thead>
       <tbody>
@@ -42,6 +43,7 @@
             <td>{{ project.start_date.strftime('%d %b %Y') }}</td>
             <td>{{ project.end_date.strftime('%d %b %Y') if project.end_date else '—' }}</td>
             <td class="numeric">{{ project.billable_hours_budget or '—' }}</td>
+            <td><a href="/projects/{{ project.id }}/calendar">Calendar</a></td>
           </tr>
         {% endfor %}
       </tbody>
