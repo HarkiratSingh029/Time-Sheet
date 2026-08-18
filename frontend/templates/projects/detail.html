@@ -12,9 +12,12 @@
       {{ project.end_date.strftime('%d %b %Y') if project.end_date else 'open ended' }}
     </p>
   </div>
-  {% if manageable %}
-    <a class="button" href="/projects/{{ project.id }}/edit">Edit project</a>
-  {% endif %}
+  <div class="form__actions">
+    <a class="button button--primary" href="/projects/{{ project.id }}/calendar">Open calendar</a>
+    {% if manageable %}
+      <a class="button" href="/projects/{{ project.id }}/edit">Edit project</a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="stack">
