@@ -1,43 +1,78 @@
 {% extends "base.html" %}
-{% block title %}Add a person — TS Timesheets{% endblock %}
+{% set editing = person is not none %}
+{% block title %}{{ 'Edit person' if editing else 'Invite someone' }} — TS Timesheets{% endblock %}
 {% block main_class %}centred{% endblock %}
 
 {% block body %}
-<h1>Add a person</h1>
+<h1>{{ person.full_name if editing else 'Invite someone' }}</h1>
 <p class="page__lede">
-  They can sign in straight away and be assigned to projects. Invitations, editing and
-  deactivation arrive in EPIC 1.
+  {% if editing %}
+    Change their details, role or tenure.
+  {% else %}
+    They receive a link to set their own password. Nobody else chooses it for them.
+  {% endif %}
 </p>
 
 {% if error %}
   <p class="notice notice--error" role="alert">{{ error }}</p>
 {% endif %}
 
-<form class="form" method="post" action="/users">
+<form class="form" method="post"
+      action="{{ '/users/' ~ person.id ~ '/edit' if editing else '/users' }}">
   <label class="field">
     <span class="field__label">Email</span>
-    <input class="field__input" type="email" name="email" required autofocus>
+    <input class="field__input" type="email" name="email" required
+           value="{{ person.email if editing else '' }}" {{ '' if editing else 'autofocus' }}>
   </label>
 
   <label class="field">
     <span class="field__label">Full name</span>
-    <input class="field__input" type="text" name="full_name" required>
+    <input class="field__input" type="text" name="full_name" required
+           value="{{ person.full_name if editing else '' }}">
   </label>
 
   <label class="field">
     <span class="field__label">Title</span>
-    <input class="field__input" type="text" name="title">
+    <input class="field__input" type="text" name="title"
+           value="{{ person.title if editing else '' }}">
   </label>
 
   <label class="field">
-    <span class="field__label">First password</span>
-    <input class="field__input" type="password" name="password" minlength="12" required>
-    <span class="field__hint">At least 12 characters. Share it with them directly.</span>
+    <span class="field__label">Role</span>
+    <select class="field__select" name="role_id" required>
+      {% for role in roles %}
+        <option value="{{ role.id }}"
+          {{ 'selected' if editing and person.role_id == role.id else '' }}>
+          {{ role.name }}
+        </option>
+      {% endfor %}
+    </select>
   </label>
 
+  {% if editing %}
+    <label class="field">
+      <span class="field__label">Skills</span>
+      <textarea class="field__textarea" name="skills">{{ person.skills }}</textarea>
+      <span class="field__hint">What they can be staffed on.</span>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Resume summary</span>
+      <textarea class="field__textarea" name="resume_summary">{{ person.resume_summary }}</textarea>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Tenure started</span>
+      <input class="field__input" type="date" name="tenure_started_on"
+             value="{{ person.tenure_started_on.isoformat() if person.tenure_started_on else '' }}">
+    </label>
+  {% endif %}
+
   <div class="form__actions">
-    <button class="button button--primary" type="submit">Add person</button>
-    <a class="button button--ghost" href="/projects">Cancel</a>
+    <button class="button button--primary" type="submit">
+      {{ 'Save changes' if editing else 'Send invitation' }}
+    </button>
+    <a class="button button--ghost" href="/users">Cancel</a>
   </div>
 </form>
 {% endblock %}

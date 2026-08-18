@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from backend.app.auth import authenticate, clear_session, issue_session, set_password
 from backend.app.auth import uses_bootstrap_password as still_on_bootstrap_password
 from backend.app.deps import PasswordChangeUser, SessionDep, SettingsDep, current_user
+from backend.app.models import utcnow
 from backend.app.security import verify_password
 from backend.app.templating import render
 
@@ -39,6 +40,9 @@ async def login(
             error="That email and password do not match an active account.",
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
+
+    user.last_signed_in_at = utcnow()
+    session.commit()
 
     must_change = still_on_bootstrap_password(user, settings)
     destination = "/account/password" if must_change else "/"

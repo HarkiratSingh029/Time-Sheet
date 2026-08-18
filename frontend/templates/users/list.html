@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}People — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>People</h1>
+    <p class="page__lede">
+      {{ people|length }} account{{ '' if people|length == 1 else 's' }}. Nobody is deleted —
+      an account with a work history is deactivated.
+    </p>
+  </div>
+  <a class="button button--primary" href="/users/new">Invite someone</a>
+</div>
+
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Name</th>
+        <th scope="col">Email</th>
+        <th scope="col">Role</th>
+        <th scope="col">Status</th>
+        <th scope="col">Last signed in</th>
+        <th scope="col"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for person in people %}
+        <tr>
+          <td>{{ person.full_name }}{% if person.title %}<br><span class="muted">{{ person.title }}</span>{% endif %}</td>
+          <td>{{ person.email }}</td>
+          <td>{{ person.role.name }}</td>
+          <td>
+            <span class="chip chip--{{ 'approved' if person.status == 'active' else ('submitted' if person.status == 'invited' else 'rejected') }}">
+              <span class="chip__dot" aria-hidden="true"></span>{{ person.status|capitalize }}
+            </span>
+          </td>
+          <td>
+            {{ person.last_signed_in_at.strftime('%d %b %Y') if person.last_signed_in_at else '—' }}
+          </td>
+          <td>
+            <div class="form__actions">
+              <a class="button button--small" href="/users/{{ person.id }}/edit">Edit</a>
+
+              {% if not person.has_accepted_invitation and person.is_active %}
+                <form method="post" action="/users/{{ person.id }}/invitation">
+                  <button class="button button--small" type="submit">Resend invitation</button>
+                </form>
+              {% endif %}
+
+              {% if person.is_active %}
+                {% if person.id != user.id %}
+                  <form method="post" action="/users/{{ person.id }}/deactivate">
+                    <button class="button button--small button--danger" type="submit">Deactivate</button>
+                  </form>
+                {% endif %}
+              {% else %}
+                <form method="post" action="/users/{{ person.id }}/reactivate">
+                  <button class="button button--small" type="submit">Reactivate</button>
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
