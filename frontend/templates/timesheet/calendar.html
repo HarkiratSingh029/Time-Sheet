@@ -20,6 +20,13 @@
   </form>
 </div>
 
+{% for rejection in rejections %}
+  <p class="notice notice--error" role="status">
+    <strong>{{ rejection.day }} was sent back</strong> by {{ rejection.by }}:
+    {{ rejection.comment }}
+  </p>
+{% endfor %}
+
 {% if not tasks %}
   <p class="notice notice--warning" role="status">
     This project has no tasks yet, so there is nothing to log time against.

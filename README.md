@@ -119,7 +119,7 @@ Mint palette in light mode, Ocean Depth in dark mode.
 
 Planning lives in **[docs/ROADMAP.md](docs/ROADMAP.md)**:
 
-- **EPIC 0 — Foundation.** The first running version: auth, users, projects, time notes, a single approval, and a deployable container.
+- **EPIC 0 — Foundation. Complete.** Auth, users, projects, time notes on a calendar, a single approval, and a deployable container.
 - **EPIC 1 — Workflow & approvals.** Roles, multi-approver chains, the full time-note lifecycle.
 - **EPIC 2 — Insight.** Project and global dashboards, metrics, health, project files.
 - **EPIC 3 — Operations.** Hardening, deployment, Cloudflare Tunnel, backups, admin tooling.

@@ -294,3 +294,62 @@ def test_every_project_page_requires_a_session(client: TestClient, path: str) ->
     response = client.get(path, follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/login"
+
+
+# --- approvals ------------------------------------------------------------------------
+
+
+def _submitted_note(client: TestClient, world, sign_in) -> int:
+    """The member logs and submits a day; the owner is the fallback approver."""
+    from datetime import date
+
+    from backend.app.models import TimeNote
+
+    project_id = world["project_id"]
+    sign_in(world["member"])
+    client.post(
+        f"/projects/{project_id}/notes",
+        data={
+            "work_date": date(2026, 2, 3).isoformat(),
+            "task_id": str(world["task_id"]),
+            "hours": "4",
+            "detail": "Logged by the member",
+            "month": "2026-02",
+        },
+    )
+    client.post(
+        f"/projects/{project_id}/notes/submit",
+        data={"from_date": date(2026, 2, 3).isoformat(), "month": "2026-02"},
+    )
+    with client.app.state.session_factory() as session:
+        return session.scalar(select(TimeNote.id).where(TimeNote.project_id == project_id))
+
+
+@pytest.mark.parametrize("action", ["approve", "reject"])
+def test_only_an_approver_or_administrator_decides(
+    client: TestClient, world, sign_in, action: str
+) -> None:
+    from backend.app.models import TimeNote, TimeNoteState
+
+    note_id = _submitted_note(client, world, sign_in)
+
+    for person in (world["member"], world["outsider"]):
+        sign_in(person)
+        response = client.post(f"/approvals/{note_id}/{action}", data={"comment": "Nope"})
+        assert response.status_code == 404, f"{person.email} must not decide this entry"
+
+    with client.app.state.session_factory() as session:
+        assert session.get(TimeNote, note_id).state is TimeNoteState.SUBMITTED
+
+
+def test_the_queue_shows_each_person_only_their_own_work(
+    client: TestClient, world, sign_in
+) -> None:
+    _submitted_note(client, world, sign_in)
+
+    sign_in(world["owner"])
+    assert "Logged by the member" in client.get("/approvals").text, "the owner approves by default"
+
+    for person in (world["member"], world["outsider"]):
+        sign_in(person)
+        assert "Logged by the member" not in client.get("/approvals").text
