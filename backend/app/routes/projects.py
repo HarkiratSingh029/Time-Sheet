@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
 from backend.app.access import (
+    can_create_projects,
     can_manage,
     get_manageable_project,
     get_visible_project,
@@ -41,7 +42,7 @@ async def list_projects(request: Request, session: SessionDep, user: RequiredUse
         "projects/list.html",
         user=user,
         projects=projects,
-        can_create=user.role.is_administrator,
+        can_create=can_create_projects(user),
     )
 
 

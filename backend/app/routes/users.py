@@ -12,7 +12,7 @@ from fastapi import APIRouter, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from backend.app.access import require_administrator
+from backend.app.access import require_user_management
 from backend.app.deps import RequiredUser, SessionDep, SettingsDep
 from backend.app.flash import flash
 from backend.app.models import User
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/new", response_class=HTMLResponse)
 async def new_user_form(request: Request, user: RequiredUser):
-    require_administrator(user)
+    require_user_management(user)
     return render(request, "users/form.html", user=user, error=None)
 
 
@@ -41,7 +41,7 @@ async def create_user(
     password: str = Form(...),
     title: str = Form(""),
 ):
-    require_administrator(user)
+    require_user_management(user)
 
     email = email.strip().lower()
     error = _problem(session, email, full_name, password)

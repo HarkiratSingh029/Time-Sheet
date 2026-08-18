@@ -24,9 +24,26 @@ every object. Administrators add users and assign their roles.
 
 ### Role
 
-Named permission set. At launch there is exactly one role — `administrator` — and roles
-are user-definable from there. A role decides access to timesheet objects and a user's
-place in the approval workflow.
+A named set of **permissions**. `administrator` (every permission) and `member`
+(`timesheet.log`) are seeded as system roles and cannot be deleted or renamed; any other
+role is defined by an administrator.
+
+Authorization asks permissions, never role names, so a role invented tomorrow behaves like
+a built-in one. The vocabulary is closed and lives in `backend/app/permissions.py` beside
+the checks that read it — a permission nothing checks is a promise the product does not
+keep.
+
+| Permission | Grants |
+| --- | --- |
+| `project.create` | Create projects |
+| `project.manage_any` | Edit any project, its members and its tasks |
+| `project.view_any` | Read every project, member or not |
+| `user.manage` | Add and manage people |
+| `approval.decide_any` | Decide any entry, not only your own queue |
+| `timesheet.log` | Log time on projects you belong to |
+
+What a member may do on a *particular* project still comes from their relationship to it —
+owner, approver, member — not from the role.
 
 ### Project
 

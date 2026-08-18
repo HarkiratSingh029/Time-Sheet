@@ -13,6 +13,7 @@ from datetime import UTC, date, datetime
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Column,
     Date,
     DateTime,
     Enum,
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Table,
     Text,
     UniqueConstraint,
 )
@@ -79,15 +81,53 @@ class ApprovalDecision(enum.StrEnum):
     REJECTED = "rejected"
 
 
+role_permissions = Table(
+    "role_permissions",
+    Base.metadata,
+    Column("role_id", ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
+    Column("permission_id", ForeignKey("permissions.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class Permission(TimestampMixin, Base):
+    """One thing a role may do.
+
+    The vocabulary is closed and lives in `backend/app/permissions.py`; rows exist so a
+    role can point at them, not so anyone can invent a verb the code never checks.
+    """
+
+    __tablename__ = "permissions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+    roles: Mapped[list[Role]] = relationship(
+        secondary=role_permissions, back_populates="permissions"
+    )
+
+
 class Role(TimestampMixin, Base):
     __tablename__ = "roles"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
     description: Mapped[str] = mapped_column(Text, default="")
+
+    # The super-role. Kept as a column so it can be protected and seeded; authorization
+    # itself reads permissions and never this flag (see backend/app/access.py).
     is_administrator: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # A system role is created by the seed and cannot be deleted or renamed.
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+
     users: Mapped[list[User]] = relationship(back_populates="role")
+    permissions: Mapped[list[Permission]] = relationship(
+        secondary=role_permissions, back_populates="roles", lazy="selectin"
+    )
+
+    def holds(self, code: str) -> bool:
+        return any(permission.code == code for permission in self.permissions)
 
 
 class User(TimestampMixin, Base):
@@ -116,6 +156,9 @@ class User(TimestampMixin, Base):
     @property
     def is_administrator(self) -> bool:
         return self.role.is_administrator
+
+    def holds(self, code: str) -> bool:
+        return self.role.holds(code)
 
 
 class Project(TimestampMixin, Base):

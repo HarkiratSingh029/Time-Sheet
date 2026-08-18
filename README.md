@@ -93,10 +93,18 @@ a plain `down` keeps your data.
 Every change must be green on these before a PR is opened:
 
 ```bash
-pytest                              # backend behaviour
+pytest                              # backend behaviour, including migration drift
 ruff check .                        # lint
 node scripts/check-frontend.mjs     # any frontend change
 python3 brands/scripts/build_all.py # any [Design] / brands change
+```
+
+Schema changes are Alembic revisions in `migrations/`. The app runs `upgrade head` at
+startup, so there is no separate deploy step:
+
+```bash
+alembic revision --autogenerate -m "what changed"
+alembic upgrade head
 ```
 
 ---

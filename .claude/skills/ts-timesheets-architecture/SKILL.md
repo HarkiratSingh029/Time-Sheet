@@ -20,7 +20,7 @@ users is wrong here.
 | API + pages | FastAPI on Uvicorn — one process serves JSON and HTML |
 | Templates | Jinja2, server-rendered, no bundler |
 | Client JS | Vanilla ES modules from `frontend/static/` |
-| Data | SQLite (WAL) through SQLAlchemy — Postgres stays a config change |
+| Data | SQLite (WAL) through SQLAlchemy, migrated by Alembic — Postgres stays a config change |
 | Validation | Pydantic v2 |
 | Files | Local volume `data/uploads/` — **no S3** |
 | Auth | Server-side sessions, signed cookies |
@@ -56,6 +56,13 @@ draft ──submit──► submitted ──all required approvals approved─�
 Access to the project comes first — the calendar is per project, bounded by project dates
 and the billable-hour budget. A consultant double-clicks a date, logs duration and detail,
 submits; the project's rules generate 1–5 approval rows; owners read the metrics.
+
+## Schema changes
+
+Every model change needs an Alembic revision in the same commit — `alembic check` runs in
+the suite and fails on drift. The app runs `upgrade head` at startup. SQLite cannot ALTER
+in place, so migrations use `render_as_batch`, and a new NOT NULL column needs a
+`server_default` or it cannot be added to a table that already has rows.
 
 ## Rules for backend work
 
