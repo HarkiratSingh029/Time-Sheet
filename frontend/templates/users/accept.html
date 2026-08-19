@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Set your password — TS Timesheets{% endblock %}
+{% block main_class %}centred{% endblock %}
+
+{% block body %}
+<h1>Welcome, {{ person.full_name }}</h1>
+<p class="page__lede">Choose a password and you are in. Length beats complexity.</p>
+
+{% if error %}
+  <p class="notice notice--error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form class="form" method="post" action="/invitations/{{ token }}">
+  <label class="field">
+    <span class="field__label">Email</span>
+    <input class="field__input" type="email" value="{{ person.email }}" disabled>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Password</span>
+    <input class="field__input" type="password" name="password" autocomplete="new-password"
+           minlength="12" required autofocus>
+    <span class="field__hint">At least 12 characters.</span>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Confirm password</span>
+    <input class="field__input" type="password" name="confirm_password"
+           autocomplete="new-password" minlength="12" required>
+  </label>
+
+  <div class="form__actions">
+    <button class="button button--primary" type="submit">Set password and sign in</button>
+  </div>
+</form>
+{% endblock %}

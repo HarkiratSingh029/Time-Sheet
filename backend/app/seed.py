@@ -105,6 +105,10 @@ class SystemRoleError(RuntimeError):
     """A system role was deleted or renamed. It underpins access for everyone."""
 
 
+class UserDeletionError(RuntimeError):
+    """A user with a work history was deleted. Deactivate them instead."""
+
+
 @event.listens_for(Session, "before_flush")
 def _protect_system_roles(session: Session, _context: object, _instances: object) -> None:
     """The administrator role cannot be deleted, renamed, or demoted.
@@ -115,6 +119,12 @@ def _protect_system_roles(session: Session, _context: object, _instances: object
     for instance in session.deleted:
         if isinstance(instance, Role) and instance.is_system:
             raise SystemRoleError(f"The {instance.name} role is built in and cannot be deleted.")
+
+        if isinstance(instance, User) and (instance.time_notes or instance.memberships):
+            raise UserDeletionError(
+                f"{instance.email} has a work history. Deactivate the account instead — "
+                "their time notes are the record of work that actually happened."
+            )
 
     for instance in session.dirty:
         if not isinstance(instance, Role) or not instance.is_system:

@@ -25,6 +25,7 @@ NAV = [
     ("Overview", "/"),
     ("Projects", "/projects"),
     ("Approvals", "/approvals"),
+    ("People", "/users"),
 ]
 
 

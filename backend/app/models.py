@@ -147,6 +147,11 @@ class User(TimestampMixin, Base):
     resume_summary: Mapped[str] = mapped_column(Text, default="")
     tenure_started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_signed_in_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     role: Mapped[Role] = relationship(back_populates="users")
     memberships: Mapped[list[ProjectMember]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
@@ -159,6 +164,19 @@ class User(TimestampMixin, Base):
 
     def holds(self, code: str) -> bool:
         return self.role.holds(code)
+
+    @property
+    def status(self) -> str:
+        """What an administrator needs to see at a glance in the people list."""
+        if not self.is_active:
+            return "deactivated"
+        if self.last_signed_in_at is None:
+            return "invited"
+        return "active"
+
+    @property
+    def has_accepted_invitation(self) -> bool:
+        return self.last_signed_in_at is not None
 
 
 class Project(TimestampMixin, Base):

@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from backend.app.models import Project, ProjectMember, Task
+from backend.app.models import Project, ProjectMember, Task, User
 
 START = "2026-01-01"
 END = "2026-06-30"
@@ -227,61 +227,32 @@ def test_the_owner_may_manage_members_and_tasks(client: TestClient, world, sign_
 # --- adding people --------------------------------------------------------------------
 
 
-def test_only_an_administrator_adds_people(client: TestClient, world, sign_in) -> None:
+def test_only_a_user_manager_adds_people(client: TestClient, world, sign_in) -> None:
     for person in (world["owner"], world["member"], world["outsider"]):
         sign_in(person)
+        assert client.get("/users").status_code == 403
         assert client.get("/users/new").status_code == 403
-        assert (
-            client.post(
-                "/users",
-                data={
-                    "email": "sneak@example.com",
-                    "full_name": "Sneaky Person",
-                    "password": "a-properly-long-password",
-                },
-            ).status_code
-            == 403
+        invited = client.post(
+            "/users",
+            data={
+                "email": "sneak@example.com",
+                "full_name": "Sneaky Person",
+                "role_id": "2",
+            },
         )
+        assert invited.status_code == 403
 
 
-def test_an_administrator_adds_a_person_who_can_then_sign_in(
-    client: TestClient, administrator, sign_in
-) -> None:
-    sign_in(administrator)
-    response = client.post(
-        "/users",
-        data={
-            "email": "New.Person@Example.com",
-            "full_name": "New Person",
-            "password": "a-properly-long-password",
-        },
-    )
-    assert response.status_code == 200
-    assert "new.person@example.com can now sign in" in response.text
+def test_a_non_manager_cannot_edit_or_deactivate_anyone(client: TestClient, world, sign_in) -> None:
+    target = world["member"]
+    for person in (world["owner"], world["outsider"]):
+        sign_in(person)
+        assert client.get(f"/users/{target.id}/edit").status_code == 403
+        assert client.post(f"/users/{target.id}/deactivate").status_code == 403
+        assert client.post(f"/users/{target.id}/invitation").status_code == 403
 
-    client.cookies.clear()
-    signed_in = client.post(
-        "/login",
-        data={"email": "new.person@example.com", "password": "a-properly-long-password"},
-        follow_redirects=False,
-    )
-    assert signed_in.status_code == 303
-    assert signed_in.headers["location"] == "/"
-
-
-def test_a_duplicate_email_is_refused(client: TestClient, administrator, sign_in) -> None:
-    sign_in(administrator)
-    response = client.post(
-        "/users",
-        data={
-            "email": administrator.email,
-            "full_name": "Impostor",
-            "password": "a-properly-long-password",
-        },
-    )
-
-    assert response.status_code == 400
-    assert "already has an account" in response.text
+    with client.app.state.session_factory() as session:
+        assert session.get(User, target.id).is_active
 
 
 # --- signed out -----------------------------------------------------------------------
