@@ -17,15 +17,22 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from backend.app.access import can_manage, get_visible_project
+from backend.app.access import can_decide_anywhere, can_manage, get_visible_project
 from backend.app.calendar_month import build_month, default_month, parse_month
 from backend.app.db import InvariantError
 from backend.app.deps import RequiredUser, SessionDep, SettingsDep
 from backend.app.flash import flash
 from backend.app.models import Project, Task, TimeNote, TimeNoteState
 from backend.app.templating import render
-from backend.app.workflow import WorkflowError, latest_rejection
+from backend.app.workflow import (
+    WorkflowError,
+    can_read_history,
+    history_of,
+    latest_rejection,
+)
+from backend.app.workflow import reopen as reopen_note
 from backend.app.workflow import submit as submit_note
+from backend.app.workflow import withdraw as withdraw_note
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["timesheet"])
 
@@ -61,6 +68,8 @@ async def calendar_view(
         month=build_month(project, year, month_number, notes, today),
         notes_json=_notes_as_json(notes),
         rejections=_rejections(notes),
+        submitted_notes=[note for note in notes if note.state is TimeNoteState.SUBMITTED],
+        approved_notes=[note for note in notes if note.state is TimeNoteState.APPROVED],
         tasks=_open_tasks(session, project),
         manageable=can_manage(user, project),
     )
@@ -144,7 +153,7 @@ async def submit_notes(
 
     try:
         for note in drafts:
-            submit_note(session, note)
+            submit_note(session, note, actor=user)
         session.commit()
     except WorkflowError as error:
         session.rollback()
@@ -214,6 +223,86 @@ async def delete_note(
     session.commit()
     flash(response, settings, "Entry removed.")
     return response
+
+
+@router.post("/notes/{note_id}/withdraw")
+async def withdraw_entry(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
+    note_id: int,
+    month: str = Form(""),
+):
+    project = get_visible_project(session, user, project_id)
+    note = _own_note(session, project, user, note_id)
+    response = _back_to_calendar(project.id, month)
+
+    try:
+        withdraw_note(session, user, note)
+        session.commit()
+    except WorkflowError as error:
+        session.rollback()
+        flash(response, settings, str(error), "error")
+        return response
+
+    flash(response, settings, f"Pulled {note.work_date:%d %b} back to draft.")
+    return response
+
+
+@router.post("/notes/{note_id}/reopen")
+async def reopen_entry(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
+    note_id: int,
+    reason: str = Form(""),
+    month: str = Form(""),
+):
+    project = get_visible_project(session, user, project_id)
+    note = session.get(TimeNote, note_id)
+    if note is None or note.project_id != project.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+
+    response = _back_to_calendar(project.id, month)
+    try:
+        reopen_note(session, user, note, reason)
+        session.commit()
+    except WorkflowError as error:
+        session.rollback()
+        flash(response, settings, str(error), "error")
+        return response
+
+    flash(response, settings, f"Reopened {note.work_date:%d %b} for {note.user.email}.")
+    return response
+
+
+@router.get("/notes/{note_id}/history", response_class=HTMLResponse)
+async def entry_history(
+    request: Request,
+    session: SessionDep,
+    user: RequiredUser,
+    project_id: int,
+    note_id: int,
+):
+    project = get_visible_project(session, user, project_id)
+    note = session.get(TimeNote, note_id)
+    if note is None or note.project_id != project.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    if not can_read_history(session, user, note):
+        # 404 rather than 403: whose day it was is itself information.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+
+    return render(
+        request,
+        "timesheet/history.html",
+        user=user,
+        project=project,
+        note=note,
+        events=history_of(note),
+        can_reopen=can_decide_anywhere(user),
+    )
 
 
 # --- helpers --------------------------------------------------------------------------

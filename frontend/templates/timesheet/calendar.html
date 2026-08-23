@@ -34,6 +34,50 @@
   </p>
 {% endif %}
 
+{% if submitted_notes or approved_notes %}
+  <section class="card">
+    <h2 class="card__title">Your submitted days this month</h2>
+    <p class="card__meta">
+      Withdraw a day while nobody has decided it. Once an approver has, the way back is
+      theirs — or an administrator's.
+    </p>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Day</th>
+            <th scope="col" class="numeric">Hours</th>
+            <th scope="col">State</th>
+            <th scope="col"><span class="visually-hidden">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for note in submitted_notes + approved_notes %}
+            <tr>
+              <td>{{ note.work_date.strftime('%a %d %b') }}</td>
+              <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+              <td>{{ state_chip(note.state) }}</td>
+              <td>
+                <div class="form__actions">
+                  <a class="button button--small"
+                     href="/projects/{{ project.id }}/notes/{{ note.id }}/history">History</a>
+                  {% if note.state.value == 'submitted' %}
+                    <form method="post"
+                          action="/projects/{{ project.id }}/notes/{{ note.id }}/withdraw">
+                      <input type="hidden" name="month" value="{{ month.key }}">
+                      <button class="button button--small button--danger" type="submit">Withdraw</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}
+
 <section class="card calendar"
          data-calendar
          data-project="{{ project.id }}"

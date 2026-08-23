@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import state_chip %}
+{% block title %}{{ note.work_date.strftime('%d %b %Y') }} history — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>{{ note.work_date.strftime('%A %d %B %Y') }}</h1>
+    <p class="page__lede">
+      {{ note.user.full_name or note.user.email }} ·
+      <a href="/projects/{{ project.id }}"><code>{{ project.code }}</code></a> ·
+      {{ note.task.name }} · {{ '%g'|format(note.duration_minutes / 60) }}h
+      {{ state_chip(note.state) }}
+    </p>
+  </div>
+  <a class="button" href="/projects/{{ project.id }}/calendar?month={{ note.work_date.strftime('%Y-%m') }}">
+    Back to the calendar
+  </a>
+</div>
+
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">History</h2>
+    <p class="card__meta">
+      Append-only. A correction is a new entry here, never an edit to an old one.
+    </p>
+
+    <ol class="chain">
+      {% for event in events %}
+        <li class="chain__step chain__step--{{ 'approved' if event.action.value == 'approved' else ('rejected' if event.action.value in ('rejected', 'reopened') else 'pending') }}">
+          <span class="chain__position numeric">{{ loop.index }}</span>
+          <div>
+            <strong>{{ event.action.value|capitalize }}</strong>
+            by {{ event.actor.full_name or event.actor.email }}
+            <span class="muted">
+              · {{ event.from_state }} → {{ event.to_state }}
+              · {{ event.occurred_at.strftime('%d %b %Y, %H:%M') }}
+            </span>
+            {% if event.reason %}<br><span class="muted">{{ event.reason }}</span>{% endif %}
+          </div>
+        </li>
+      {% else %}
+        <li class="chain__step">Nothing recorded yet.</li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  {% if can_reopen and note.state.value == 'approved' %}
+    <section class="card">
+      <h2 class="card__title">Reopen this day</h2>
+      <p class="card__meta">
+        Returns it to the author as a draft and clears the approvals. The reason is recorded.
+      </p>
+      <form class="form" method="post"
+            action="/projects/{{ project.id }}/notes/{{ note.id }}/reopen">
+        <label class="field">
+          <span class="field__label">Reason</span>
+          <input class="field__input" type="text" name="reason" required
+                 placeholder="Why is approved time being reopened?">
+        </label>
+        <input type="hidden" name="month" value="{{ note.work_date.strftime('%Y-%m') }}">
+        <div class="form__actions">
+          <button class="button button--danger" type="submit">Reopen</button>
+        </div>
+      </form>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

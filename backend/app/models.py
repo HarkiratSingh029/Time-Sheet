@@ -289,6 +289,11 @@ class TimeNote(TimestampMixin, Base):
     approvals: Mapped[list[Approval]] = relationship(
         back_populates="time_note", cascade="all, delete-orphan", order_by="Approval.sequence"
     )
+    audit_events: Mapped[list[AuditEvent]] = relationship(
+        back_populates="time_note",
+        cascade="all, delete-orphan",
+        order_by="AuditEvent.id",
+    )
 
 
 class Approval(TimestampMixin, Base):
@@ -322,6 +327,41 @@ class Approval(TimestampMixin, Base):
 
     time_note: Mapped[TimeNote] = relationship(back_populates="approvals")
     approver: Mapped[User] = relationship()
+
+
+class AuditAction(enum.StrEnum):
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+    REOPENED = "reopened"
+
+
+class AuditEvent(Base):
+    """One recorded transition on a time note.
+
+    Append-only, and deliberately not a `TimestampMixin`: an audit row has no `updated_at`
+    because it is never updated. What happened, who did it, and when — corrections are new
+    rows, never edits to old ones.
+    """
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    time_note_id: Mapped[int] = mapped_column(
+        ForeignKey("time_notes.id", ondelete="CASCADE"), index=True
+    )
+    actor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+
+    action: Mapped[AuditAction] = mapped_column(enum_column(AuditAction))
+    from_state: Mapped[str] = mapped_column(String(16))
+    to_state: Mapped[str] = mapped_column(String(16))
+    reason: Mapped[str] = mapped_column(Text, default="")
+
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    time_note: Mapped[TimeNote] = relationship(back_populates="audit_events")
+    actor: Mapped[User] = relationship()
 
 
 class ProjectFile(TimestampMixin, Base):
