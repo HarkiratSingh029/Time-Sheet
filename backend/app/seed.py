@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from backend.app import permissions as vocabulary
 from backend.app.config import Settings
-from backend.app.models import Permission, Role, User
+from backend.app.models import AuditEvent, Permission, Role, TimeNote, User
 from backend.app.security import hash_password
 
 ADMINISTRATOR_ROLE = "administrator"
@@ -109,6 +109,10 @@ class UserDeletionError(RuntimeError):
     """A user with a work history was deleted. Deactivate them instead."""
 
 
+class AuditTamperError(RuntimeError):
+    """An audit event was changed or removed. The trail is append-only."""
+
+
 @event.listens_for(Session, "before_flush")
 def _protect_system_roles(session: Session, _context: object, _instances: object) -> None:
     """The administrator role cannot be deleted, renamed, or demoted.
@@ -117,6 +121,11 @@ def _protect_system_roles(session: Session, _context: object, _instances: object
     cannot reach around it (the same reasoning as the time-note invariants in db.py).
     """
     for instance in session.deleted:
+        if isinstance(instance, AuditEvent) and not _note_is_being_deleted(session, instance):
+            raise AuditTamperError(
+                "Audit events are append-only. A correction is a new event, not an edit."
+            )
+
         if isinstance(instance, Role) and instance.is_system:
             raise SystemRoleError(f"The {instance.name} role is built in and cannot be deleted.")
 
@@ -127,6 +136,11 @@ def _protect_system_roles(session: Session, _context: object, _instances: object
             )
 
     for instance in session.dirty:
+        if isinstance(instance, AuditEvent) and session.is_modified(instance):
+            raise AuditTamperError(
+                "Audit events are append-only. A correction is a new event, not an edit."
+            )
+
         if not isinstance(instance, Role) or not instance.is_system:
             continue
         history = inspect(instance).attrs
@@ -136,6 +150,13 @@ def _protect_system_roles(session: Session, _context: object, _instances: object
             raise SystemRoleError("A built-in role cannot stop being built in.")
         if instance.name == ADMINISTRATOR_ROLE and history.is_administrator.history.has_changes():
             raise SystemRoleError("The administrator role cannot be demoted.")
+
+
+def _note_is_being_deleted(session: Session, event: AuditEvent) -> bool:
+    """Cascading with the time note it describes is not tampering."""
+    return any(
+        isinstance(other, TimeNote) and other.id == event.time_note_id for other in session.deleted
+    )
 
 
 def seed(session: Session, settings: Settings) -> User | None:

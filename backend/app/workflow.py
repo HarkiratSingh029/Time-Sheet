@@ -11,6 +11,15 @@ opens one row per approver, in that order, and the chain is **sequential**: appr
 sees an entry only once *n* has approved. A rejection anywhere sends the whole day back to
 its author and clears the rest — there is nothing to keep deciding once the work is going
 to change.
+
+Two moves exist for correcting a month after the fact:
+
+* **withdraw** — the author pulls back their own submission while nobody has decided yet;
+* **reopen** — an administrator returns an approved day to draft, with a reason.
+
+Every transition writes an `AuditEvent`. Reopening approved time without a record is how
+timesheet data quietly stops being trustworthy, so the record is not optional: it is
+written here, in the one place every transition already funnels through.
 """
 
 from __future__ import annotations
@@ -22,6 +31,8 @@ from backend.app.access import can_decide_anywhere
 from backend.app.models import (
     Approval,
     ApprovalDecision,
+    AuditAction,
+    AuditEvent,
     Project,
     ProjectMember,
     TimeNote,
@@ -55,11 +66,33 @@ def approvers_for(session: Session, project: Project) -> list[User]:
     return [project.owner]
 
 
-def submit(session: Session, note: TimeNote) -> None:
+def record(
+    session: Session,
+    note: TimeNote,
+    actor: User,
+    action: AuditAction,
+    previous: TimeNoteState,
+    reason: str = "",
+) -> AuditEvent:
+    """Append one row describing a transition. Never called to change an existing one."""
+    event = AuditEvent(
+        time_note_id=note.id,
+        actor_id=actor.id,
+        action=action,
+        from_state=previous.value,
+        to_state=note.state.value,
+        reason=reason.strip(),
+    )
+    session.add(event)
+    return event
+
+
+def submit(session: Session, note: TimeNote, actor: User | None = None) -> None:
     """Move a draft to submitted and open its approval rows."""
     if note.state is not TimeNoteState.DRAFT:
         raise WorkflowError("Only a draft can be submitted.")
 
+    previous = note.state
     note.state = TimeNoteState.SUBMITTED
     note.submitted_at = utcnow()
 
@@ -81,6 +114,9 @@ def submit(session: Session, note: TimeNote) -> None:
             approval.decision = ApprovalDecision.PENDING
             approval.decided_at = None
             approval.comment = ""
+
+    session.flush()
+    record(session, note, actor or note.user, AuditAction.SUBMITTED, previous)
 
 
 def current_approval(note: TimeNote) -> Approval | None:
@@ -108,6 +144,7 @@ def chain_of(note: TimeNote) -> list[Approval]:
 
 
 def approve(session: Session, user: User, note: TimeNote) -> None:
+    previous = note.state
     approval = _open_approval_for(session, user, note)
     approval.decision = ApprovalDecision.APPROVED
     approval.decided_at = utcnow()
@@ -115,6 +152,8 @@ def approve(session: Session, user: User, note: TimeNote) -> None:
 
     if _every_approval_settled(note):
         note.state = TimeNoteState.APPROVED
+
+    record(session, note, user, AuditAction.APPROVED, previous)
 
 
 def reject(session: Session, user: User, note: TimeNote, comment: str) -> None:
@@ -127,6 +166,7 @@ def reject(session: Session, user: User, note: TimeNote, comment: str) -> None:
         raise WorkflowError("A rejection needs a comment explaining what to change.")
 
     approval = _open_approval_for(session, user, note)
+    previous = note.state
     approval.decision = ApprovalDecision.REJECTED
     approval.decided_at = utcnow()
     approval.comment = comment.strip()
@@ -141,6 +181,66 @@ def reject(session: Session, user: User, note: TimeNote, comment: str) -> None:
 
     note.state = TimeNoteState.DRAFT
     note.submitted_at = None
+
+    record(session, note, user, AuditAction.REJECTED, previous, comment)
+
+
+def withdraw(session: Session, user: User, note: TimeNote) -> None:
+    """The author pulls back their own submission, while nobody has decided yet.
+
+    Once an approver has spent attention on a day, taking it back silently would erase
+    their decision; from then on the way back is a rejection or a reopen.
+    """
+    if note.user_id != user.id:
+        raise WorkflowError("Only the person who logged a day can withdraw it.")
+    if note.state is not TimeNoteState.SUBMITTED:
+        raise WorkflowError("Only a submitted entry can be withdrawn.")
+    if any(approval.decision is not ApprovalDecision.PENDING for approval in note.approvals):
+        raise WorkflowError(
+            "An approver has already decided this entry, so it can no longer be withdrawn."
+        )
+
+    previous = note.state
+    note.state = TimeNoteState.DRAFT
+    note.submitted_at = None
+    _clear_approvals(note)
+
+    record(session, note, user, AuditAction.WITHDRAWN, previous)
+
+
+def reopen(session: Session, user: User, note: TimeNote, reason: str) -> None:
+    """An administrator returns approved time to its author, with a reason on the record."""
+    if not can_decide_anywhere(user):
+        raise WorkflowError("Only an administrator can reopen approved time.")
+    if note.state is not TimeNoteState.APPROVED:
+        raise WorkflowError("Only an approved entry can be reopened.")
+    if not reason.strip():
+        raise WorkflowError("Reopening approved time needs a reason.")
+
+    previous = note.state
+    note.state = TimeNoteState.DRAFT
+    note.submitted_at = None
+    _clear_approvals(note)
+
+    record(session, note, user, AuditAction.REOPENED, previous, reason)
+
+
+def history_of(note: TimeNote) -> list[AuditEvent]:
+    return sorted(note.audit_events, key=lambda event: event.id or 0)
+
+
+def can_read_history(session: Session, user: User, note: TimeNote) -> bool:
+    """Its author, its approvers, and anyone who may decide anywhere."""
+    if note.user_id == user.id or can_decide_anywhere(user):
+        return True
+    return any(approval.approver_id == user.id for approval in note.approvals)
+
+
+def _clear_approvals(note: TimeNote) -> None:
+    for approval in note.approvals:
+        approval.decision = ApprovalDecision.PENDING
+        approval.decided_at = None
+        approval.comment = ""
 
 
 def pending_notes_for(session: Session, user: User) -> list[TimeNote]:

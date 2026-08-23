@@ -56,6 +56,9 @@
         {% endif %}
 
         <div class="form__actions">
+          <a class="button button--small"
+             href="/projects/{{ note.project_id }}/notes/{{ note.id }}/history">History</a>
+
           <form method="post" action="/approvals/{{ note.id }}/approve">
             <button class="button button--primary" type="submit">Approve</button>
           </form>
