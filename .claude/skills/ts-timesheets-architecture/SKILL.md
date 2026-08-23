@@ -57,6 +57,13 @@ Access to the project comes first — the calendar is per project, bounded by pr
 and the billable-hour budget. A consultant double-clicks a date, logs duration and detail,
 submits; the project's rules generate 1–5 approval rows; owners read the metrics.
 
+## Notifications
+
+In-app badges are part of the interface and always work. Email is optional: with
+`TS_SMTP_HOST` unset nothing is sent, nothing is queued, and nothing is logged as an error.
+One digest per approver per day, stamped with `digest_sent_on` so a restart cannot send a
+second. A failed send is logged and left for the next cycle — never retried in a request.
+
 ## Schema changes
 
 Every model change needs an Alembic revision in the same commit — `alembic check` runs in

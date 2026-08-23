@@ -37,7 +37,9 @@
               {% for item in nav_items|default([]) %}
                 <a class="nav__link{% if item.active %} nav__link--active{% endif %}"
                    href="{{ item.href }}"
-                   {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+                   {% if item.active %}aria-current="page"{% endif %}>{{ item.label
+                  }}{% if item.href == '/approvals' and pending_badge %}<span class="nav__badge"
+                    aria-label="{{ pending_badge }} waiting on you">{{ pending_badge }}</span>{% endif %}</a>
               {% endfor %}
             </nav>
           {% endif %}

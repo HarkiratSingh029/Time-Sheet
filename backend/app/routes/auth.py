@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from backend.app.auth import authenticate, clear_session, issue_session, set_password
 from backend.app.auth import uses_bootstrap_password as still_on_bootstrap_password
 from backend.app.deps import PasswordChangeUser, SessionDep, SettingsDep, current_user
+from backend.app.flash import flash
 from backend.app.models import utcnow
 from backend.app.security import verify_password
 from backend.app.templating import render
@@ -55,6 +56,36 @@ async def login(
 async def logout():
     response = RedirectResponse("/login", status_code=status.HTTP_303_SEE_OTHER)
     clear_session(response)
+    return response
+
+
+@router.get("/account", response_class=HTMLResponse)
+async def account(request: Request, user: PasswordChangeUser, settings: SettingsDep):
+    return render(
+        request,
+        "account.html",
+        user=user,
+        email_enabled=settings.email_enabled,
+    )
+
+
+@router.post("/account/digest")
+async def set_digest_preference(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: PasswordChangeUser,
+    receive_digest: bool = Form(False),
+):
+    user.digest_opt_out = not receive_digest
+    session.add(user)
+    session.commit()
+
+    response = RedirectResponse("/account", status_code=status.HTTP_303_SEE_OTHER)
+    flash(
+        response,
+        settings,
+        "Daily summary on." if receive_digest else "Daily summary off. Badges stay.",
+    )
     return response
 
 

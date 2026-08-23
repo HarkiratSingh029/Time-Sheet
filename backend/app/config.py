@@ -46,9 +46,22 @@ class Settings(BaseSettings):
 
     tunnel_token: str = ""
 
+    # Email is off unless a host is configured: a laptop must never send anything.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    smtp_from: str = "ts-timesheets@localhost"
+    digest_hour: int = 8
+
     @property
     def is_production(self) -> bool:
         return self.env == "production"
+
+    @property
+    def email_enabled(self) -> bool:
+        return bool(self.smtp_host.strip())
 
     @property
     def uploads_dir(self) -> Path:

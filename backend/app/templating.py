@@ -26,6 +26,7 @@ NAV = [
     ("Projects", "/projects"),
     ("Approvals", "/approvals"),
     ("People", "/users"),
+    ("Account", "/account"),
 ]
 
 
@@ -38,6 +39,24 @@ def nav_items(path: str) -> list[dict[str, Any]]:
         }
         for label, href in NAV
     ]
+
+
+def _pending_badge(request: Request, user: Any) -> int:
+    """How many entries are waiting on this person, for the nav badge.
+
+    One query per rendered page. At thirty users that is cheaper than any cache would be
+    to keep honest, and a badge that lags is worse than no badge.
+    """
+    if user is None:
+        return 0
+
+    from backend.app.notifications import pending_count
+
+    factory = getattr(request.app.state, "session_factory", None)
+    if factory is None:
+        return 0
+    with factory() as session:
+        return pending_count(session, session.merge(user, load=False))
 
 
 def render(
@@ -56,6 +75,7 @@ def render(
         {
             "nav_items": nav_items(request.url.path),
             "messages": messages,
+            "pending_badge": _pending_badge(request, context.get("user")),
             **context,
         },
         status_code=status_code,

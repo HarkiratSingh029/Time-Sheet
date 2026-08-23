@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Account — TS Timesheets{% endblock %}
+{% block main_class %}centred{% endblock %}
+
+{% block body %}
+<h1>Your account</h1>
+<p class="page__lede">{{ user.email }}</p>
+
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">Daily summary</h2>
+    <p class="card__meta">
+      {% if email_enabled %}
+        One email a day listing what is waiting on your approval — never one per entry.
+      {% else %}
+        Email is not configured on this deployment, so nothing is sent. The badge in the
+        navigation still shows what is waiting on you.
+      {% endif %}
+    </p>
+
+    <form class="form" method="post" action="/account/digest">
+      <label class="field">
+        <span class="field__label">
+          <input type="checkbox" name="receive_digest" value="true"
+                 {{ 'checked' if not user.digest_opt_out else '' }}>
+          Email me the daily summary
+        </span>
+        <span class="field__hint">
+          Turning this off silences email only. In-app badges are part of the interface.
+        </span>
+      </label>
+      <div class="form__actions">
+        <button class="button button--primary" type="submit">Save</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Password</h2>
+    <p class="card__meta">Change the password you sign in with.</p>
+    <p><a class="button" href="/account/password">Change password</a></p>
+  </section>
+</div>
+{% endblock %}
