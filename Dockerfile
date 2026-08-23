@@ -3,7 +3,7 @@
 # Single stage on purpose: there is no bundler and no node in the runtime, so a builder
 # stage would buy nothing but a longer build (docs/ARCHITECTURE.md §2).
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

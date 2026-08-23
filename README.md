@@ -44,6 +44,10 @@ tests/            Pytest suite — consolidated, few and meaningful (§4.7 of CH
 Prerequisites: **Python 3.12+** and **Node 20+**. Docker is optional for local dev and
 required only for the container path.
 
+The container runs **Python 3.14**, matching development — the interpreter that serves
+users is the one the tests ran on. `requires-python` stays at 3.12 so the package still
+installs on older interpreters.
+
 ```bash
 git clone https://github.com/HarkiratSingh029/Time-Sheet.git
 cd Time-Sheet
