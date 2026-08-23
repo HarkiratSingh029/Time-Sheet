@@ -7,8 +7,8 @@
   <div>
     <h1>Approvals</h1>
     <p class="page__lede">
-      {% if notes %}
-        {{ notes|length }} entr{{ 'y' if notes|length == 1 else 'ies' }} waiting on you.
+      {% if total_pending %}
+        {{ total_pending }} entr{{ 'y' if total_pending == 1 else 'ies' }} waiting on you{% if filters.any_applied %}, {{ showing }} shown{% endif %}.
       {% else %}
         Nothing is waiting on you.
       {% endif %}
@@ -16,71 +16,188 @@
   </div>
 </div>
 
-{% if notes %}
-  <div class="stack">
-    {% for note in notes %}
+{% if total_pending %}
+  <form class="form filters" method="get" action="/approvals">
+    <label class="field">
+      <span class="field__label">Project</span>
+      <select class="field__select" name="project_id">
+        <option value="">All projects</option>
+        {% for project in projects %}
+          <option value="{{ project.id }}" {{ 'selected' if filters.project_id == project.id else '' }}>
+            {{ project.code }} — {{ project.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Person</span>
+      <select class="field__select" name="person_id">
+        <option value="">Everyone</option>
+        {% for person in people %}
+          <option value="{{ person.id }}" {{ 'selected' if filters.person_id == person.id else '' }}>
+            {{ person.full_name or person.email }}
+          </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Worked from</span>
+      <input class="field__input" type="date" name="since"
+             value="{{ filters.since.isoformat() if filters.since else '' }}">
+    </label>
+
+    <label class="field">
+      <span class="field__label">Worked to</span>
+      <input class="field__input" type="date" name="until"
+             value="{{ filters.until.isoformat() if filters.until else '' }}">
+    </label>
+
+    <div class="form__actions">
+      <button class="button button--primary" type="submit">Apply</button>
+      {% if filters.any_applied %}
+        <a class="button button--ghost" href="/approvals">Clear</a>
+      {% endif %}
+    </div>
+  </form>
+{% endif %}
+
+{% if groups %}
+  <div class="stack" data-queue-results>
+    {% for group in groups %}
       <section class="card">
         <div class="page__header">
           <div>
             <h2 class="card__title">
-              {{ note.work_date.strftime('%A %d %B %Y') }} · {{ '%g'|format(note.duration_minutes / 60) }}h
+              {{ group.person.full_name or group.person.email }} ·
+              week of {{ group.week_starting.strftime('%d %b %Y') }}
             </h2>
             <p class="card__meta">
-              {{ note.user.full_name or note.user.email }}
-              {%- if note.user.full_name %} <span class="muted">({{ note.user.email }})</span>{% endif %} ·
-              <a href="/projects/{{ note.project_id }}"><code>{{ note.project.code }}</code></a> ·
-              {{ note.task.name }}{{ '' if note.task.is_billable else ' (non-billable)' }}
+              <a href="/projects/{{ group.project.id }}"><code>{{ group.project.code }}</code></a> ·
+              {{ group.notes|length }} entr{{ 'y' if group.notes|length == 1 else 'ies' }} ·
+              <strong class="numeric">{{ '%g'|format(group.hours) }}h</strong>
+              {% if group.person.full_name %}· {{ group.person.email }}{% endif %}
             </p>
           </div>
-          {{ state_chip(note.state) }}
+          {% if group.is_ageing %}
+            <span class="chip chip--rejected">
+              <span class="chip__dot" aria-hidden="true"></span>
+              Waiting {{ group.oldest_age_days }} days
+            </span>
+          {% endif %}
         </div>
 
-        {% if note.detail %}<p>{{ note.detail }}</p>{% endif %}
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">Task</th>
+                <th scope="col" class="numeric">Hours</th>
+                <th scope="col">Detail</th>
+                <th scope="col" class="numeric">Waiting</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for note in group.notes %}
+                <tr>
+                  <td>{{ note.work_date.strftime('%a %d %b') }}</td>
+                  <td>{{ note.task.name }}{{ '' if note.task.is_billable else ' (non-billable)' }}</td>
+                  <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+                  <td>
+                    {{ note.detail }}
+                    {% if note.approvals|length > 1 %}
+                      <details class="chain-details">
+                        <summary>
+                          Approval chain
+                          <span class="muted numeric">
+                            {{ note.approvals|selectattr('decision.value', 'equalto', 'approved')|list|length }}
+                            of {{ note.approvals|length }}
+                          </span>
+                        </summary>
+                        <ol class="chain">
+                          {% for step in note.approvals|sort(attribute='sequence') %}
+                            <li class="chain__step chain__step--{{ step.decision.value }}">
+                              <span class="chain__position numeric">{{ step.sequence }}</span>
+                              {{ step.approver.full_name or step.approver.email }}
+                              <span class="muted">
+                                {%- if step.decision.value == 'approved' %} approved
+                                {%- elif step.decision.value == 'rejected' %} sent back
+                                {%- elif loop.first or (note.approvals|sort(attribute='sequence'))[loop.index0 - 1].decision.value == 'approved' %} waiting on them now
+                                {%- else %} not yet their turn{% endif %}
+                              </span>
+                            </li>
+                          {% endfor %}
+                        </ol>
+                      </details>
+                    {% endif %}
+                  </td>
+                  <td class="numeric">
+                    {% set age = age_of(note) %}
+                    {% if age >= ageing_days %}<strong>{{ age }}d</strong>{% else %}{{ age }}d{% endif %}
+                  </td>
+                  <td>
+                    <div class="form__actions">
+                      <a class="button button--small"
+                         href="/projects/{{ note.project_id }}/notes/{{ note.id }}/history">History</a>
 
-        {% if note.approvals|length > 1 %}
-          <p class="card__meta">Approval chain</p>
-          <ol class="chain">
-            {% for step in note.approvals|sort(attribute='sequence') %}
-              <li class="chain__step chain__step--{{ step.decision.value }}">
-                <span class="chain__position numeric">{{ step.sequence }}</span>
-                {{ step.approver.full_name or step.approver.email }}
-                <span class="muted">
-                  {%- if step.decision.value == 'approved' %} approved
-                  {%- elif step.decision.value == 'rejected' %} sent back
-                  {%- elif loop.first or (note.approvals|sort(attribute='sequence'))[loop.index0 - 1].decision.value == 'approved' %} waiting on them now
-                  {%- else %} not yet their turn{% endif %}
-                </span>
-              </li>
-            {% endfor %}
-          </ol>
-        {% endif %}
+                      <form method="post" action="/approvals/{{ note.id }}/approve">
+                        <input type="hidden" name="next" value="{{ query_string }}">
+                        <button class="button button--small button--primary" type="submit">Approve</button>
+                      </form>
 
-        <div class="form__actions">
-          <a class="button button--small"
-             href="/projects/{{ note.project_id }}/notes/{{ note.id }}/history">History</a>
-
-          <form method="post" action="/approvals/{{ note.id }}/approve">
-            <button class="button button--primary" type="submit">Approve</button>
-          </form>
-
-          <form class="approval-reject" method="post" action="/approvals/{{ note.id }}/reject">
-            <label class="field">
-              <span class="visually-hidden">Reason for sending it back</span>
-              <input class="field__input" type="text" name="comment" required
-                     placeholder="What needs to change?">
-            </label>
-            <button class="button button--danger" type="submit">Send back</button>
-          </form>
+                      <form class="approval-reject" method="post" action="/approvals/{{ note.id }}/reject">
+                        <label class="field">
+                          <span class="visually-hidden">Reason for sending it back</span>
+                          <input class="field__input" type="text" name="comment" required
+                                 placeholder="What needs to change?">
+                        </label>
+                        <input type="hidden" name="next" value="{{ query_string }}">
+                        <button class="button button--small button--danger" type="submit">Send back</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+
+        <form class="group-approve" method="post" action="/approvals/approve-group">
+          {% for note_id in group.note_ids %}
+            <input type="hidden" name="note_ids" value="{{ note_id }}">
+          {% endfor %}
+          <input type="hidden" name="next" value="{{ query_string }}">
+          <button class="button button--primary" type="submit"
+                  data-confirm-count="{{ group.notes|length }}">
+            Approve all {{ group.notes|length }} ·
+            {{ '%g'|format(group.hours) }}h
+          </button>
+        </form>
       </section>
     {% endfor %}
   </div>
+{% elif total_pending %}
+  <section class="card">
+    <h2 class="card__title">Nothing matches those filters</h2>
+    <p class="card__meta">
+      {{ total_pending }} entr{{ 'y is' if total_pending == 1 else 'ies are' }} still waiting.
+      <a href="/approvals">Clear the filters</a>.
+    </p>
+  </section>
 {% else %}
   <section class="card">
     <h2 class="card__title">The queue is empty</h2>
     <p class="card__meta">
-      Entries appear here once a consultant submits a day on a project you approve.
+      Entries appear here once a consultant submits a day on a project you approve, and the
+      chain has reached you.
     </p>
   </section>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/queue.js"></script>
 {% endblock %}
