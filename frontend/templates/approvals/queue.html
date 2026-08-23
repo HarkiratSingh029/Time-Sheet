@@ -37,6 +37,24 @@
 
         {% if note.detail %}<p>{{ note.detail }}</p>{% endif %}
 
+        {% if note.approvals|length > 1 %}
+          <p class="card__meta">Approval chain</p>
+          <ol class="chain">
+            {% for step in note.approvals|sort(attribute='sequence') %}
+              <li class="chain__step chain__step--{{ step.decision.value }}">
+                <span class="chain__position numeric">{{ step.sequence }}</span>
+                {{ step.approver.full_name or step.approver.email }}
+                <span class="muted">
+                  {%- if step.decision.value == 'approved' %} approved
+                  {%- elif step.decision.value == 'rejected' %} sent back
+                  {%- elif loop.first or (note.approvals|sort(attribute='sequence'))[loop.index0 - 1].decision.value == 'approved' %} waiting on them now
+                  {%- else %} not yet their turn{% endif %}
+                </span>
+              </li>
+            {% endfor %}
+          </ol>
+        {% endif %}
+
         <div class="form__actions">
           <form method="post" action="/approvals/{{ note.id }}/approve">
             <button class="button button--primary" type="submit">Approve</button>

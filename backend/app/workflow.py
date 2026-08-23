@@ -6,10 +6,11 @@ draft ──submit──► submitted ──all required approvals approved─�
   └────reject──────────┘
 ```
 
-EPIC 0 runs one approver per project. The chain of up to five arrives in EPIC 1, so the
-shape here is deliberately the general one — `Approval.sequence` exists, and
-`is_settled` counts approvals rather than assuming a single row. Generalising later is
-then a change to who gets rows, not a rewrite of what a row means.
+A project declares how many approvals it needs (1 to 5) and orders its approvers. Submitting
+opens one row per approver, in that order, and the chain is **sequential**: approver *n+1*
+sees an entry only once *n* has approved. A rejection anywhere sends the whole day back to
+its author and clears the rest — there is nothing to keep deciding once the work is going
+to change.
 """
 
 from __future__ import annotations
@@ -35,15 +36,17 @@ class WorkflowError(ValueError):
 
 
 def approvers_for(session: Session, project: Project) -> list[User]:
-    """The people who sign off time on this project, in a stable order.
+    """The chain, in order, capped at what the project asks for.
 
     Falls back to the owner: a project with no approver named would otherwise strand every
-    submission in a queue nobody can see.
+    submission in a queue nobody can see. If fewer approvers are named than the project
+    requires, the chain is as long as the named list — demanding a third signature from
+    nobody would freeze the entry forever.
     """
     memberships = session.scalars(
         select(ProjectMember)
         .where(ProjectMember.project_id == project.id, ProjectMember.is_approver.is_(True))
-        .order_by(ProjectMember.id)
+        .order_by(ProjectMember.approval_order, ProjectMember.id)
     ).all()
 
     approvers = [membership.user for membership in memberships]
@@ -80,11 +83,28 @@ def submit(session: Session, note: TimeNote) -> None:
             approval.comment = ""
 
 
+def current_approval(note: TimeNote) -> Approval | None:
+    """The one row the chain is waiting on. Later rows are not yet anybody's business."""
+    for approval in sorted(note.approvals, key=lambda row: row.sequence):
+        if approval.decision is ApprovalDecision.PENDING:
+            return approval
+    return None
+
+
 def can_decide(session: Session, user: User, note: TimeNote) -> bool:
-    """`approval.decide_any` reaches everywhere; otherwise you must hold a row on this note."""
-    if can_decide_anywhere(user):
-        return True
-    return any(approval.approver_id == user.id for approval in note.approvals)
+    """You may decide only when the chain has reached you.
+
+    `approval.decide_any` reaches every entry, but still only the step that is actually
+    open — it is a wider queue, not a way to skip ahead of approver 1.
+    """
+    open_step = current_approval(note)
+    if open_step is None:
+        return False
+    return can_decide_anywhere(user) or open_step.approver_id == user.id
+
+
+def chain_of(note: TimeNote) -> list[Approval]:
+    return sorted(note.approvals, key=lambda row: row.sequence)
 
 
 def approve(session: Session, user: User, note: TimeNote) -> None:
@@ -111,6 +131,14 @@ def reject(session: Session, user: User, note: TimeNote, comment: str) -> None:
     approval.decided_at = utcnow()
     approval.comment = comment.strip()
 
+    # Nothing further is worth deciding: the day is going back to be changed. Later steps
+    # are cleared so a resubmission starts the chain from the top.
+    for later in note.approvals:
+        if later.sequence > approval.sequence:
+            later.decision = ApprovalDecision.PENDING
+            later.decided_at = None
+            later.comment = ""
+
     note.state = TimeNoteState.DRAFT
     note.submitted_at = None
 
@@ -128,7 +156,11 @@ def pending_notes_for(session: Session, user: User) -> list[TimeNote]:
     if not can_decide_anywhere(user):
         query = query.where(Approval.approver_id == user.id)
 
-    return list(session.scalars(query.order_by(TimeNote.work_date, TimeNote.id).distinct()).all())
+    notes = session.scalars(query.order_by(TimeNote.work_date, TimeNote.id).distinct()).all()
+
+    # SQL cannot express "and it is your turn": the open step is the first pending row, so
+    # filter in Python rather than leaving approver 2 looking at approver 1's work.
+    return [note for note in notes if can_decide(session, user, note)]
 
 
 def latest_rejection(note: TimeNote) -> Approval | None:
@@ -144,13 +176,14 @@ def _open_approval_for(session: Session, user: User, note: TimeNote) -> Approval
     if note.state is not TimeNoteState.SUBMITTED:
         raise WorkflowError("Only a submitted entry can be decided.")
 
-    for approval in sorted(note.approvals, key=lambda row: row.sequence):
-        if approval.decision is not ApprovalDecision.PENDING:
-            continue
-        if approval.approver_id == user.id or can_decide_anywhere(user):
-            return approval
+    open_step = current_approval(note)
+    if open_step is None:
+        raise WorkflowError("Every approval on this entry has already been decided.")
 
-    raise WorkflowError("You are not an approver on this entry.")
+    if open_step.approver_id == user.id or can_decide_anywhere(user):
+        return open_step
+
+    raise WorkflowError("This entry is waiting on an earlier approver.")
 
 
 def _every_approval_settled(note: TimeNote) -> bool:

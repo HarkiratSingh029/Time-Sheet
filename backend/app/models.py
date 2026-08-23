@@ -233,9 +233,12 @@ class ProjectMember(TimestampMixin, Base):
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
 
-    # Whether this member signs off time notes on this project. The chain of up to five
-    # approvers arrives in EPIC 1; EPIC 0 uses a single approver.
+    # Whether this member signs off time notes on this project.
     is_approver: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Position in the approval chain. Approver 2 sees an entry only once 1 has approved,
+    # so the order is part of the rule, not a display preference.
+    approval_order: Mapped[int] = mapped_column(Integer, default=1)
 
     project: Mapped[Project] = relationship(back_populates="members")
     user: Mapped[User] = relationship(back_populates="memberships")
