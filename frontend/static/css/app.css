@@ -723,3 +723,30 @@ code,
   font-weight: 700;
   color: var(--color-text-muted);
 }
+
+/* --- queue filters -------------------------------------------------------- */
+
+.filters {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  align-items: end;
+  margin-bottom: var(--space-6);
+}
+
+.group-approve {
+  margin-top: var(--space-4);
+}
+
+.chain-details {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.chain-details summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.chain-details .chain {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}

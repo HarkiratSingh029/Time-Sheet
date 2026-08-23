@@ -324,3 +324,18 @@ def test_the_queue_shows_each_person_only_their_own_work(
     for person in (world["member"], world["outsider"]):
         sign_in(person)
         assert "Logged by the member" not in client.get("/approvals").text
+
+
+def test_bulk_approve_is_refused_to_a_non_approver(client: TestClient, world, sign_in) -> None:
+    """A bulk action is a convenience over the same rule, never a way around it."""
+    from backend.app.models import TimeNote, TimeNoteState
+
+    note_id = _submitted_note(client, world, sign_in)
+
+    for person in (world["member"], world["outsider"]):
+        sign_in(person)
+        response = client.post("/approvals/approve-group", data={"note_ids": [note_id]})
+        assert "not yours to decide" in response.text
+
+    with client.app.state.session_factory() as session:
+        assert session.get(TimeNote, note_id).state is TimeNoteState.SUBMITTED
