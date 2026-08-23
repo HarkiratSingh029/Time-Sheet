@@ -15,11 +15,11 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import NamedTuple
 
-from sqlalchemy import select
+from sqlalchemy import Select, and_, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from backend.app.models import Approval, ApprovalDecision, Project, TimeNote, TimeNoteState, User
-from backend.app.workflow import can_decide, can_decide_anywhere
+from backend.app.workflow import can_decide_anywhere
 
 # Matches the amber project-health threshold in docs/DATA_MODEL.md §4: the same number
 # should not mean two different things in one product.
@@ -105,25 +105,47 @@ def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
-def pending_for(session: Session, user: User, filters: Filters) -> list[TimeNote]:
-    """Entries waiting on this person, narrowed by the filters."""
-    query = (
-        select(TimeNote)
-        .join(Approval, Approval.time_note_id == TimeNote.id)
-        .options(
-            selectinload(TimeNote.approvals),
-            selectinload(TimeNote.user),
-            selectinload(TimeNote.project),
-            selectinload(TimeNote.task),
-        )
-        .where(
-            TimeNote.state == TimeNoteState.SUBMITTED,
-            Approval.decision == ApprovalDecision.PENDING,
+def awaiting_this_person(user: User, *, strict: bool = False) -> object:
+    """SQL for "this entry's open step is theirs".
+
+    The open step is the lowest-numbered pending approval, so the condition is: a pending
+    approval exists for them, with no earlier pending approval on the same note. Expressing
+    it here rather than filtering in Python is what lets the nav badge be a `COUNT` on every
+    page render instead of loading the whole queue.
+    """
+    mine = Approval.__table__.alias("mine")
+    earlier = Approval.__table__.alias("earlier")
+
+    no_earlier_step = ~exists(
+        select(earlier.c.id).where(
+            and_(
+                earlier.c.time_note_id == mine.c.time_note_id,
+                earlier.c.decision == ApprovalDecision.PENDING.value,
+                earlier.c.sequence < mine.c.sequence,
+            )
         )
     )
 
-    if not can_decide_anywhere(user):
-        query = query.where(Approval.approver_id == user.id)
+    conditions = [
+        mine.c.time_note_id == TimeNote.id,
+        mine.c.decision == ApprovalDecision.PENDING.value,
+        no_earlier_step,
+    ]
+    # `strict` asks the narrower question: is the chain waiting on *them personally*.
+    # Someone holding `approval.decide_any` can act on anything, which is right for a queue
+    # and wrong for a daily email — a backstop is not somebody who is being waited on.
+    if strict or not can_decide_anywhere(user):
+        conditions.append(mine.c.approver_id == user.id)
+
+    return exists(select(mine.c.id).where(and_(*conditions)))
+
+
+def pending_query(user: User, filters: Filters, *, strict: bool = False) -> Select[tuple[TimeNote]]:
+    query = select(TimeNote).where(
+        TimeNote.state == TimeNoteState.SUBMITTED,
+        awaiting_this_person(user, strict=strict),
+    )
+
     if filters.project_id is not None:
         query = query.where(TimeNote.project_id == filters.project_id)
     if filters.person_id is not None:
@@ -133,10 +155,28 @@ def pending_for(session: Session, user: User, filters: Filters) -> list[TimeNote
     if filters.until is not None:
         query = query.where(TimeNote.work_date <= filters.until)
 
-    notes = session.scalars(query.order_by(TimeNote.work_date, TimeNote.id).distinct()).all()
+    return query
 
-    # "It is your turn" depends on the first pending row, which the join cannot express.
-    return [note for note in notes if can_decide(session, user, note)]
+
+def pending_for(
+    session: Session, user: User, filters: Filters, *, strict: bool = False
+) -> list[TimeNote]:
+    """Entries whose open approval step belongs to this person, narrowed by the filters."""
+    query = pending_query(user, filters, strict=strict).options(
+        selectinload(TimeNote.approvals).selectinload(Approval.approver),
+        selectinload(TimeNote.user),
+        selectinload(TimeNote.project),
+        selectinload(TimeNote.task),
+    )
+    return list(session.scalars(query.order_by(TimeNote.work_date, TimeNote.id)).all())
+
+
+def pending_count(session: Session, user: User) -> int:
+    """Just the number, for the nav badge — no rows loaded."""
+    return (
+        session.scalar(select(func.count()).select_from(pending_query(user, Filters()).subquery()))
+        or 0
+    )
 
 
 def group_by_person_and_week(notes: list[TimeNote]) -> list[Group]:

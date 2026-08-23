@@ -147,6 +147,12 @@ class User(TimestampMixin, Base):
     resume_summary: Mapped[str] = mapped_column(Text, default="")
     tenure_started_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
+    # Opting out silences email only; in-app badges are part of the interface, not a
+    # subscription.
+    digest_opt_out: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The day the last digest went out, so a restart cannot send a second one.
+    digest_sent_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
     invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_signed_in_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

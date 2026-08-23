@@ -18,7 +18,11 @@ from backend.app.models import Base
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True, which would switch off every logger the
+    # application already created — including ts.notifications and ts.scheduler, whose
+    # warnings are the only sign that a digest failed. Migrations run at startup, so the
+    # default would silence the app in production.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 

@@ -106,6 +106,8 @@ running with a silent default.
 | `TS_DATA_DIR` | Root for the database and uploads. |
 | `TS_ADMIN_EMAIL` / `TS_ADMIN_PASSWORD` | Bootstrap administrator, used once on an empty database. |
 | `TS_TUNNEL_TOKEN` | Cloudflare Tunnel token; the tunnel container starts only when set. |
+| `TS_SMTP_*` | Mail server for the daily digest. **Unset means email is off** — nothing sent, nothing queued, no error. |
+| `TS_DIGEST_HOUR` | Local hour the daily digest goes out. Default 8. |
 
 ---
 
@@ -126,7 +128,9 @@ docker compose down -v && docker compose up --build   # fresh container launch
 ## 7. What we are deliberately not building
 
 - No S3, object store or CDN.
-- No Redis, Celery or message broker. Scheduled work is a background task in-process.
+- No Redis, Celery or message broker. The one scheduled job — a daily digest — is an
+  in-process loop whose work is idempotent, so an imprecise clock and a mid-morning restart
+  both cost nothing.
 - No Kubernetes. One host, one compose file.
 - No microservices. One deployable.
 - No SPA framework or bundler in the runtime image.

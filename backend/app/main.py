@@ -22,6 +22,8 @@ from backend.app.routes import auth as auth_routes
 from backend.app.routes import projects as project_routes
 from backend.app.routes import timesheet as timesheet_routes
 from backend.app.routes import users as user_routes
+from backend.app.scheduler import start as start_digests
+from backend.app.scheduler import stop as stop_digests
 from backend.app.seed import seed
 from backend.app.templating import render
 
@@ -45,8 +47,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if created is not None:
             print(f"seeded bootstrap administrator: {created.email}")
 
+        digest_task = start_digests(app, session_factory, settings)
+
         yield
 
+        await stop_digests(digest_task)
         engine.dispose()
 
     app = FastAPI(
