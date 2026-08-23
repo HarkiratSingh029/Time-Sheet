@@ -10,7 +10,7 @@ from datetime import date
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from backend.app.access import (
     can_create_projects,
@@ -22,12 +22,23 @@ from backend.app.access import (
 )
 from backend.app.deps import RequiredUser, SessionDep, SettingsDep
 from backend.app.flash import flash
-from backend.app.models import Project, ProjectMember, ProjectStatus, Task, TimeNote, User
+from backend.app.models import (
+    MAX_APPROVALS_PER_PROJECT,
+    Approval,
+    ApprovalDecision,
+    Project,
+    ProjectMember,
+    ProjectStatus,
+    Task,
+    TimeNote,
+    TimeNoteState,
+    User,
+)
 from backend.app.templating import render
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-EPIC_0_REQUIRED_APPROVALS = 1
+DEFAULT_REQUIRED_APPROVALS = 1
 
 
 class ProjectFormError(ValueError):
@@ -78,10 +89,11 @@ async def create_project(
     proposed_duration_days: str = Form(""),
     start_date: str = Form(...),
     end_date: str = Form(""),
+    required_approvals: int = Form(DEFAULT_REQUIRED_APPROVALS),
 ):
     require_project_creation(user)
 
-    project = Project(required_approvals=EPIC_0_REQUIRED_APPROVALS)
+    project = Project(required_approvals=DEFAULT_REQUIRED_APPROVALS)
     try:
         _apply_form(
             project,
@@ -97,6 +109,7 @@ async def create_project(
             proposed_duration_days=proposed_duration_days,
             start_date=start_date,
             end_date=end_date,
+            required_approvals=required_approvals,
         )
         _assert_code_is_free(session, project.code, project_id=None)
     except ProjectFormError as error:
@@ -174,8 +187,10 @@ async def update_project(
     proposed_duration_days: str = Form(""),
     start_date: str = Form(...),
     end_date: str = Form(""),
+    required_approvals: int = Form(DEFAULT_REQUIRED_APPROVALS),
 ):
     project = get_manageable_project(session, user, project_id)
+    previously = project.required_approvals
 
     try:
         _apply_form(
@@ -192,9 +207,11 @@ async def update_project(
             proposed_duration_days=proposed_duration_days,
             start_date=start_date,
             end_date=end_date,
+            required_approvals=required_approvals,
         )
         _assert_code_is_free(session, project.code, project_id=project.id)
         _assert_window_still_covers_time_notes(session, project)
+        _assert_chain_is_not_shortened_under_entries_in_flight(session, project, previously)
     except ProjectFormError as error:
         session.rollback()
         return render(
@@ -226,6 +243,7 @@ async def add_member(
     project_id: int,
     user_id: int = Form(...),
     is_approver: bool = Form(False),
+    approval_order: int = Form(1),
 ):
     project = get_manageable_project(session, user, project_id)
 
@@ -241,7 +259,14 @@ async def add_member(
         flash(response, settings, f"{person.email} is already on this project.", "warning")
         return response
 
-    session.add(ProjectMember(project_id=project.id, user_id=user_id, is_approver=is_approver))
+    session.add(
+        ProjectMember(
+            project_id=project.id,
+            user_id=user_id,
+            is_approver=is_approver,
+            approval_order=max(1, min(approval_order, MAX_APPROVALS_PER_PROJECT)),
+        )
+    )
     session.commit()
     flash(response, settings, f"{person.email} added to {project.code}.")
     return response
@@ -262,6 +287,27 @@ async def remove_member(
 
     if member is None or member.project_id != project.id:
         flash(response, settings, "That membership no longer exists.", "warning")
+        return response
+
+    awaiting = session.scalar(
+        select(Approval.id)
+        .join(TimeNote, TimeNote.id == Approval.time_note_id)
+        .where(
+            TimeNote.project_id == project.id,
+            TimeNote.state == TimeNoteState.SUBMITTED,
+            Approval.approver_id == member.user_id,
+            Approval.decision == ApprovalDecision.PENDING,
+        )
+        .limit(1)
+    )
+    if awaiting is not None:
+        flash(
+            response,
+            settings,
+            "Entries are waiting on this approver. Decide them, or reassign the chain, "
+            "before removing them from the project.",
+            "error",
+        )
         return response
 
     logged = session.scalar(
@@ -401,9 +447,48 @@ def _apply_form(project: Project, **fields: object) -> None:
 
     project.start_date = _required_date(fields["start_date"], "Start date")
     project.end_date = _optional_date(fields["end_date"], "End date")
+    project.required_approvals = _approval_count(fields["required_approvals"])
 
     if project.end_date is not None and project.end_date < project.start_date:
         raise ProjectFormError("The end date cannot fall before the start date.")
+
+
+def _approval_count(value: object) -> int:
+    try:
+        count = int(str(value).strip())
+    except ValueError as error:
+        raise ProjectFormError("Approvals required must be a whole number.") from error
+    if not 1 <= count <= MAX_APPROVALS_PER_PROJECT:
+        raise ProjectFormError(
+            f"A project needs between 1 and {MAX_APPROVALS_PER_PROJECT} approvals."
+        )
+    return count
+
+
+def _entries_in_flight(session, project: Project) -> int:
+    return (
+        session.scalar(
+            select(func.count(TimeNote.id)).where(
+                TimeNote.project_id == project.id,
+                TimeNote.state == TimeNoteState.SUBMITTED,
+            )
+        )
+        or 0
+    )
+
+
+def _assert_chain_is_not_shortened_under_entries_in_flight(
+    session, project: Project, previously: int
+) -> None:
+    """Shortening the chain mid-flight would silently drop approvals already granted."""
+    if project.required_approvals >= previously:
+        return
+    in_flight = _entries_in_flight(session, project)
+    if in_flight:
+        raise ProjectFormError(
+            f"{in_flight} entr{'y is' if in_flight == 1 else 'ies are'} waiting on the current "
+            f"chain of {previously}. Clear the queue before shortening it."
+        )
 
 
 def _assert_code_is_free(session, code: str, *, project_id: int | None) -> None:

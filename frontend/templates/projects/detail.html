@@ -31,7 +31,10 @@
           <tr><th scope="row">Cost</th><td class="numeric">{{ project.cost if project.cost is not none else '—' }}</td></tr>
           <tr><th scope="row">Billable hours budget</th><td class="numeric">{{ project.billable_hours_budget or '—' }}</td></tr>
           <tr><th scope="row">Proposed duration</th><td class="numeric">{{ project.proposed_duration_days or '—' }}</td></tr>
-          <tr><th scope="row">Approvals required</th><td class="numeric">{{ project.required_approvals }}</td></tr>
+          <tr>
+            <th scope="row">Approvals required</th>
+            <td class="numeric">{{ project.required_approvals }}</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -50,6 +53,7 @@
             <tr>
               <th scope="col">Person</th>
               <th scope="col">Approver</th>
+              <th scope="col" class="numeric">Order</th>
               {% if manageable %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
             </tr>
           </thead>
@@ -61,6 +65,7 @@
                   {% if member.user.full_name %}<br><span class="muted">{{ member.user.email }}</span>{% endif %}
                 </td>
                 <td>{{ 'Yes' if member.is_approver else 'No' }}</td>
+                <td class="numeric">{{ member.approval_order if member.is_approver else '—' }}</td>
                 {% if manageable %}
                   <td>
                     <form method="post" action="/projects/{{ project.id }}/members/{{ member.id }}/remove">
@@ -92,6 +97,14 @@
           <label class="field">
             <span class="field__label">
               <input type="checkbox" name="is_approver" value="true"> Approves time on this project
+            </span>
+          </label>
+          <label class="field">
+            <span class="field__label">Position in the chain</span>
+            <input class="field__input" type="number" name="approval_order" min="1" max="5" value="1">
+            <span class="field__hint">
+              Only used when they approve. This project needs {{ project.required_approvals }}
+              approval{{ '' if project.required_approvals == 1 else 's' }}.
             </span>
           </label>
           <div class="form__actions">
