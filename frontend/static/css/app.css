@@ -764,3 +764,38 @@ code,
   background: var(--color-state-pending);
   border-radius: var(--radius-pill);
 }
+
+/* --- week grid ------------------------------------------------------------ */
+
+.week-grid th[scope="row"] {
+  text-align: left;
+  white-space: normal;
+  min-width: 10rem;
+}
+
+.week-grid__hours {
+  width: 4.5rem;
+  padding: var(--space-1) var(--space-2);
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.week-grid__hours[readonly] {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.week-grid__day--out {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+}
+
+.week-grid__day--today {
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.week-grid__cell {
+  display: inline-flex;
+  gap: var(--space-1);
+}

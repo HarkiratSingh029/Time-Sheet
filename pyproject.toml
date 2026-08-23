@@ -40,6 +40,9 @@ extend-exclude = [".venv", "data", "brands/dist"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+# An en dash is correct typography in a date range, and this product shows plenty of them.
+# RUF001 guards against homoglyphs in code, not punctuation in display strings.
+allowed-confusables = ["–", "—", "·"]
 ignore = [
   # The repo prefers expressive names over prose; ARG/ANN-style noise is not enforced.
   "B008", # FastAPI's Depends() in defaults is the framework's idiom.

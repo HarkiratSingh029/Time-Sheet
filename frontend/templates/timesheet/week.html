@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import state_chip %}
+{% block title %}{{ project.code }} week — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="page__lede">
+      <a href="/projects/{{ project.id }}"><code>{{ project.code }}</code></a> ·
+      {{ project.start_date.strftime('%d %b %Y') }} –
+      {{ project.end_date.strftime('%d %b %Y') if project.end_date else 'open ended' }}
+    </p>
+  </div>
+  <div class="form__actions">
+    <a class="button" href="/projects/{{ project.id }}/calendar?month={{ week.starting.strftime('%Y-%m') }}">
+      Month view
+    </a>
+    {% if has_drafts %}
+      <form method="post" action="/projects/{{ project.id }}/notes/submit">
+        <input type="hidden" name="from_date" value="{{ week.starting.isoformat() }}">
+        <input type="hidden" name="to_date" value="{{ week.days[-1].date.isoformat() }}">
+        <input type="hidden" name="month" value="{{ week.starting.strftime('%Y-%m') }}">
+        <button class="button button--primary" type="submit">Submit this week</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if not tasks %}
+  <p class="notice notice--warning" role="status">
+    This project has no tasks yet, so there is nothing to log time against.
+  </p>
+{% else %}
+
+<section class="card">
+  <header class="calendar__header">
+    <div class="calendar__nav">
+      {% if week.previous %}
+        <a class="button button--small" href="?week={{ week.previous }}" aria-label="Previous week">←</a>
+      {% else %}
+        <span class="button button--small" aria-disabled="true">←</span>
+      {% endif %}
+      <h2 class="calendar__title">{{ week.label }}</h2>
+      {% if week.next %}
+        <a class="button button--small" href="?week={{ week.next }}" aria-label="Next week">→</a>
+      {% else %}
+        <span class="button button--small" aria-disabled="true">→</span>
+      {% endif %}
+    </div>
+    <p class="calendar__total muted">
+      {{ '%g'|format(week.total_minutes / 60) }}h this week
+    </p>
+  </header>
+
+  <p class="calendar__hint muted">
+    Type hours into a cell and press Enter or Tab. Clearing a cell removes the entry.
+  </p>
+
+  <div class="table-wrap">
+    <table class="table week-grid">
+      <thead>
+        <tr>
+          <th scope="col">Task</th>
+          {% for day in week.days %}
+            <th scope="col" class="numeric{{ ' week-grid__day--out' if not day.in_window else '' }}{{ ' week-grid__day--today' if day.is_today else '' }}">
+              {{ day.date.strftime('%a') }}<br>
+              <span class="muted">{{ day.date.strftime('%d %b') }}</span>
+            </th>
+          {% endfor %}
+          <th scope="col" class="numeric">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in week.rows %}
+          <tr>
+            <th scope="row">
+              {{ row.task.name }}
+              {% if not row.task.is_billable %}<br><span class="muted">non-billable</span>{% endif %}
+            </th>
+            {% for cell in row.cells %}
+              <td class="numeric{{ ' week-grid__day--out' if not cell.day.in_window else '' }}">
+                {% if cell.day.in_window %}
+                  <form method="post" action="/projects/{{ project.id }}/week/cells" class="week-grid__cell">
+                    <input type="hidden" name="work_date" value="{{ cell.day.date.isoformat() }}">
+                    <input type="hidden" name="task_id" value="{{ cell.task.id }}">
+                    <input type="hidden" name="week" value="{{ week.key }}">
+                    <label>
+                      <span class="visually-hidden">
+                        {{ row.task.name }} on {{ cell.day.date.strftime('%A %d %B') }}
+                      </span>
+                      <input class="field__input week-grid__hours" type="number" name="hours"
+                             step="0.25" min="0" max="24" value="{{ cell.hours }}"
+                             {{ 'readonly' if not cell.editable else '' }}
+                             {{ 'data-week-cell' if cell.editable else '' }}>
+                    </label>
+                    <noscript><button class="button button--small" type="submit">Save</button></noscript>
+                  </form>
+                  {% if cell.state and cell.state != 'draft' %}
+                    {{ state_chip(cell.state) }}
+                  {% endif %}
+                {% else %}
+                  <span class="muted">—</span>
+                {% endif %}
+              </td>
+            {% endfor %}
+            <td class="numeric"><strong>{{ '%g'|format(row.total_minutes / 60) }}h</strong></td>
+          </tr>
+        {% endfor %}
+        <tr>
+          <th scope="row">Total</th>
+          {% for day in week.days %}
+            <td class="numeric"><strong>{{ '%g'|format(week.daily_minutes(day.date) / 60) }}h</strong></td>
+          {% endfor %}
+          <td class="numeric"><strong>{{ '%g'|format(week.total_minutes / 60) }}h</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">Copy last week</h2>
+    <p class="card__meta">
+      Reproduces every <strong>draft</strong> from the previous week into this one. Days that
+      already have time are left alone, and submitted or approved days are never copied.
+    </p>
+    <form method="post" action="/projects/{{ project.id }}/week/copy-last-week">
+      <input type="hidden" name="week" value="{{ week.key }}">
+      <button class="button" type="submit">Copy last week into this one</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Fill a range</h2>
+    <p class="card__meta">
+      One task, one duration, across a span. Days that already carry an entry are skipped.
+    </p>
+    <form class="form filters" method="post" action="/projects/{{ project.id }}/week/fill">
+      <label class="field">
+        <span class="field__label">Task</span>
+        <select class="field__select" name="task_id" required>
+          {% for task in tasks %}
+            <option value="{{ task.id }}">{{ task.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field__label">Hours a day</span>
+        <input class="field__input" type="number" name="hours" step="0.25" min="0.25" max="24"
+               value="8" required>
+      </label>
+      <label class="field">
+        <span class="field__label">From</span>
+        <input class="field__input" type="date" name="from_date" required
+               value="{{ week.starting.isoformat() }}">
+      </label>
+      <label class="field">
+        <span class="field__label">To</span>
+        <input class="field__input" type="date" name="to_date" required
+               value="{{ week.days[-1].date.isoformat() }}">
+      </label>
+      <label class="field">
+        <span class="field__label">
+          <input type="checkbox" name="include_weekends" value="true"> Include weekends
+        </span>
+      </label>
+      <input type="hidden" name="week" value="{{ week.key }}">
+      <div class="form__actions">
+        <button class="button button--primary" type="submit">Fill</button>
+      </div>
+    </form>
+  </section>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/week.js"></script>
+{% endblock %}

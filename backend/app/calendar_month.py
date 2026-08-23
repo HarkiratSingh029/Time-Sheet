@@ -100,7 +100,8 @@ def _shift(year: int, month: int, delta: int) -> tuple[int, int]:
     return index // 12, index % 12 + 1
 
 
-def _within_window(project: Project, day: date) -> bool:
+def within_window(project: Project, day: date) -> bool:
+    """Shared with the week grid: one answer to which days a project can hold."""
     if day < project.start_date:
         return False
     return project.end_date is None or day <= project.end_date
@@ -130,7 +131,7 @@ def build_month(
             Day(
                 date=day,
                 in_month=day.month == month,
-                in_window=_within_window(project, day),
+                in_window=within_window(project, day),
                 is_weekend=day.weekday() >= 5,
                 is_today=day == today,
                 notes=sorted(by_date.get(day, []), key=lambda note: note.id or 0),

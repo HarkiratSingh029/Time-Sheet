@@ -12,12 +12,17 @@
       {{ project.end_date.strftime('%d %b %Y') if project.end_date else 'open ended' }}
     </p>
   </div>
+  <div class="form__actions">
+    <a class="button" href="/projects/{{ project.id }}/week?week={{ month.weeks[0][0].date.isoformat() }}">
+      Week view
+    </a>
   <form method="post" action="/projects/{{ project.id }}/notes/submit">
     <input type="hidden" name="from_date" value="{{ month.weeks[0][0].date.isoformat() }}">
     <input type="hidden" name="to_date" value="{{ month.weeks[-1][-1].date.isoformat() }}">
     <input type="hidden" name="month" value="{{ month.key }}">
     <button class="button button--primary" type="submit">Submit this month</button>
   </form>
+  </div>
 </div>
 
 {% for rejection in rejections %}
