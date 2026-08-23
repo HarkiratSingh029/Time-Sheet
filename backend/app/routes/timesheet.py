@@ -11,14 +11,22 @@ Two rules hold on every route here, not just in the UI:
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
 from backend.app.access import can_decide_anywhere, can_manage, get_visible_project
-from backend.app.calendar_month import build_month, default_month, parse_month
+from backend.app.calendar_month import build_month, default_month, parse_month, within_window
+from backend.app.calendar_week import (
+    DAYS_IN_WEEK,
+    build_week,
+    days_already_logged,
+    notes_in,
+    parse_week,
+    week_start,
+)
 from backend.app.db import InvariantError
 from backend.app.deps import RequiredUser, SessionDep, SettingsDep
 from backend.app.flash import flash
@@ -60,7 +68,7 @@ async def calendar_view(
         select(TimeNote).where(TimeNote.project_id == project.id, TimeNote.user_id == user.id)
     ).all()
 
-    return render(
+    response = render(
         request,
         "timesheet/calendar.html",
         user=user,
@@ -73,6 +81,227 @@ async def calendar_view(
         tasks=_open_tasks(session, project),
         manageable=can_manage(user, project),
     )
+    response.set_cookie(VIEW_COOKIE, "month", max_age=31_536_000, samesite="lax", path="/")
+    return response
+
+
+VIEW_COOKIE = "ts_calendar_view"
+
+
+@router.get("/week", response_class=HTMLResponse)
+async def week_view(
+    request: Request,
+    session: SessionDep,
+    user: RequiredUser,
+    project_id: int,
+    week: str | None = None,
+):
+    project = get_visible_project(session, user, project_id)
+    today = date.today()
+    starting = parse_week(week, default_month(project, today))
+    ending = starting + timedelta(days=DAYS_IN_WEEK - 1)
+
+    tasks = _open_tasks(session, project)
+    notes = notes_in(session, project, user.id, starting, ending)
+
+    response = render(
+        request,
+        "timesheet/week.html",
+        user=user,
+        project=project,
+        week=build_week(project, starting, tasks, notes, today),
+        tasks=tasks,
+        has_drafts=any(note.state is TimeNoteState.DRAFT for note in notes),
+    )
+    # Remembered per user, in their own browser: a view is a preference, not data.
+    response.set_cookie(VIEW_COOKIE, "week", max_age=31_536_000, samesite="lax", path="/")
+    return response
+
+
+@router.post("/week/cells")
+async def save_week_cell(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
+    work_date: str = Form(...),
+    task_id: int = Form(...),
+    hours: str = Form(""),
+    week: str = Form(""),
+):
+    """One cell of the grid. Empty clears the entry; anything else writes it.
+
+    Both branches go through the same helpers the month view uses, so the project window,
+    the duration limits and the frozen-once-submitted rule need no restating here.
+    """
+    project = get_visible_project(session, user, project_id)
+    response = _back_to_week(project.id, week)
+
+    try:
+        day = _parse_date(work_date)
+        task = _task_on_project(session, project, task_id)
+        existing = _cell_note(session, project, user, task.id, day)
+
+        if not hours.strip():
+            if existing is None:
+                return response
+            if existing.state is not TimeNoteState.DRAFT:
+                flash(response, settings, _frozen_message(existing), "error")
+                return response
+            session.delete(existing)
+            session.commit()
+            flash(response, settings, f"Cleared {day:%d %b}.")
+            return response
+
+        minutes = _minutes_from_hours(hours)
+
+        if existing is None:
+            session.add(
+                TimeNote(
+                    project_id=project.id,
+                    task_id=task.id,
+                    user_id=user.id,
+                    work_date=day,
+                    duration_minutes=minutes,
+                    state=TimeNoteState.DRAFT,
+                )
+            )
+        elif existing.state is not TimeNoteState.DRAFT:
+            flash(response, settings, _frozen_message(existing), "error")
+            return response
+        else:
+            existing.duration_minutes = minutes
+
+        session.commit()
+    except (EntryError, InvariantError) as error:
+        session.rollback()
+        flash(response, settings, str(error), "error")
+        return response
+
+    flash(response, settings, f"Saved {day:%d %b}.")
+    return response
+
+
+@router.post("/week/copy-last-week")
+async def copy_last_week(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
+    week: str = Form(...),
+):
+    """Reproduce last week's drafts into this one, shifted seven days.
+
+    Only drafts: a submitted or approved day is a statement somebody has acted on, and
+    copying it forward would quietly claim the same work twice.
+    """
+    project = get_visible_project(session, user, project_id)
+    response = _back_to_week(project.id, week)
+
+    starting = week_start(_parse_date(week))
+    previous = starting - timedelta(days=DAYS_IN_WEEK)
+
+    source = notes_in(
+        session, project, user.id, previous, previous + timedelta(days=DAYS_IN_WEEK - 1)
+    )
+    drafts = [note for note in source if note.state is TimeNoteState.DRAFT]
+    if not drafts:
+        flash(response, settings, "There are no drafts in the previous week to copy.", "warning")
+        return response
+
+    occupied = days_already_logged(
+        notes_in(session, project, user.id, starting, starting + timedelta(days=DAYS_IN_WEEK - 1))
+    )
+
+    created, skipped, outside = 0, 0, 0
+    for note in drafts:
+        target = note.work_date + timedelta(days=DAYS_IN_WEEK)
+        if not within_window(project, target):
+            outside += 1
+            continue
+        if target in occupied:
+            skipped += 1
+            continue
+        session.add(
+            TimeNote(
+                project_id=project.id,
+                task_id=note.task_id,
+                user_id=user.id,
+                work_date=target,
+                duration_minutes=note.duration_minutes,
+                detail=note.detail,
+                state=TimeNoteState.DRAFT,
+            )
+        )
+        occupied.add(target)
+        created += 1
+
+    session.commit()
+    flash(response, settings, _bulk_message(created, skipped, outside))
+    return response
+
+
+@router.post("/week/fill")
+async def fill_range(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
+    task_id: int = Form(...),
+    hours: str = Form(...),
+    from_date: str = Form(...),
+    to_date: str = Form(...),
+    include_weekends: bool = Form(False),
+    detail: str = Form(""),
+    week: str = Form(""),
+):
+    """One task and one duration across a span, skipping days that already carry an entry."""
+    project = get_visible_project(session, user, project_id)
+    response = _back_to_week(project.id, week)
+
+    try:
+        first = _parse_date(from_date)
+        last = _parse_date(to_date)
+        minutes = _minutes_from_hours(hours)
+        task = _task_on_project(session, project, task_id)
+    except EntryError as error:
+        flash(response, settings, str(error), "error")
+        return response
+
+    if last < first:
+        flash(response, settings, "That range ends before it starts.", "error")
+        return response
+
+    occupied = days_already_logged(notes_in(session, project, user.id, first, last))
+
+    created, skipped, outside = 0, 0, 0
+    day = first
+    while day <= last:
+        if day.weekday() >= 5 and not include_weekends:
+            day += timedelta(days=1)
+            continue
+        if not within_window(project, day):
+            outside += 1
+        elif day in occupied:
+            skipped += 1
+        else:
+            session.add(
+                TimeNote(
+                    project_id=project.id,
+                    task_id=task.id,
+                    user_id=user.id,
+                    work_date=day,
+                    duration_minutes=minutes,
+                    detail=detail.strip(),
+                    state=TimeNoteState.DRAFT,
+                )
+            )
+            created += 1
+        day += timedelta(days=1)
+
+    session.commit()
+    flash(response, settings, _bulk_message(created, skipped, outside))
+    return response
 
 
 @router.post("/notes")
@@ -303,6 +532,34 @@ async def entry_history(
         events=history_of(note),
         can_reopen=can_decide_anywhere(user),
     )
+
+
+def _back_to_week(project_id: int, week: str) -> RedirectResponse:
+    suffix = f"?week={week}" if week else ""
+    return RedirectResponse(
+        f"/projects/{project_id}/week{suffix}", status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+def _cell_note(session, project: Project, user, task_id: int, day: date) -> TimeNote | None:
+    return session.scalar(
+        select(TimeNote).where(
+            TimeNote.project_id == project.id,
+            TimeNote.user_id == user.id,
+            TimeNote.task_id == task_id,
+            TimeNote.work_date == day,
+        )
+    )
+
+
+def _bulk_message(created: int, skipped: int, outside: int) -> str:
+    """Always say what happened, including what was left alone."""
+    parts = [f"Created {created} entr{'y' if created == 1 else 'ies'}"]
+    if skipped:
+        parts.append(f"{skipped} day{'' if skipped == 1 else 's'} already had time logged")
+    if outside:
+        parts.append(f"{outside} fell outside the project")
+    return ", ".join(parts) + "."
 
 
 # --- helpers --------------------------------------------------------------------------
