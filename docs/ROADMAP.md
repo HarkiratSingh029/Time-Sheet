@@ -8,13 +8,14 @@ stories**.
 | Epic | Theme | Issue | Status |
 | --- | --- | --- | --- |
 | **EPIC 0** | Foundation — a running timesheet | [#2](https://github.com/HarkiratSingh029/Time-Sheet/issues/2) | **Complete** |
-| **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | **In progress** |
-| **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | Planned |
+| **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | **Complete** |
+| **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | **In progress** |
 | **EPIC 3** | Operations — hardening, deployment & CI | [#5](https://github.com/HarkiratSingh029/Time-Sheet/issues/5) | Planned |
 
 Stories are promoted from a checklist on their epic to real issues when that epic starts —
 an issue opened four months before anyone reads it is a stale issue. EPIC 0's stories
-(#6–#12) are merged; EPIC 1's are open as #21–#27. EPICs 2 and 3 remain checklists.
+(#6–#12) and EPIC 1's (#21–#27) are merged; EPIC 2's are open as #38–#44. EPIC 3 remains a
+checklist.
 
 ---
 
@@ -52,6 +53,10 @@ metrics, file uploads, exports, notifications, CI. Each has an epic of its own.
 **Goal:** the workflow described in `docs/DATA_MODEL.md` §3, in full — user-defined roles,
 up to five approvers per project, and a time-note lifecycle a team can actually operate.
 
+**Done.** 1.5 was taken before 1.4 so the bulk approve actions were audited by construction
+rather than retrofitted. Alembic (#21) and the Python 3.14 container image (#31) were pulled
+forward from EPIC 3 along the way, each on its own ticket.
+
 | # | Issue | Story |
 | --- | --- | --- |
 | 1.1 | [#21](https://github.com/HarkiratSingh029/Time-Sheet/issues/21) | Role and permission model — user-defined roles beyond `administrator` |
@@ -68,15 +73,15 @@ up to five approvers per project, and a time-note lifecycle a team can actually 
 
 **Goal:** project owners see billability and project health without asking anyone.
 
-| # | Story |
-| --- | --- |
-| 2.1 | Metrics engine: hours, billability, burn, derived health |
-| 2.2 | Per-project dashboard: status, completion, consultants, timesheets, commercials |
-| 2.3 | Global dashboard: upcoming deadlines, health distribution, utilisation |
-| 2.4 | Project files: upload, list, download from the local volume |
-| 2.5 | Exports: timesheet CSV and a per-project PDF report |
-| 2.6 | Search and filtering across projects, users and time notes |
-| 2.7 | Consultant self-view: my hours, my submissions, my approvals |
+| # | Issue | Story |
+| --- | --- | --- |
+| 2.1 | [#38](https://github.com/HarkiratSingh029/Time-Sheet/issues/38) | Metrics engine: hours, billability, burn, derived health |
+| 2.2 | [#39](https://github.com/HarkiratSingh029/Time-Sheet/issues/39) | Per-project dashboard: status, completion, consultants, timesheets, commercials |
+| 2.3 | [#40](https://github.com/HarkiratSingh029/Time-Sheet/issues/40) | Global dashboard: upcoming deadlines, health distribution, utilisation |
+| 2.4 | [#41](https://github.com/HarkiratSingh029/Time-Sheet/issues/41) | Project files: upload, list, download from the local volume |
+| 2.5 | [#42](https://github.com/HarkiratSingh029/Time-Sheet/issues/42) | Exports: timesheet CSV and a per-project PDF report |
+| 2.6 | [#43](https://github.com/HarkiratSingh029/Time-Sheet/issues/43) | Search and filtering across projects, users and time notes |
+| 2.7 | [#44](https://github.com/HarkiratSingh029/Time-Sheet/issues/44) | Consultant self-view: my hours, my submissions, my approvals |
 
 ---
 
