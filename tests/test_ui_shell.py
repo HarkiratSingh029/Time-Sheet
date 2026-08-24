@@ -109,8 +109,13 @@ def test_every_page_template_extends_the_layout() -> None:
 # --- the design system ----------------------------------------------------------------
 
 
-def test_status_chips_carry_a_label_not_only_a_colour(signed_in: TestClient) -> None:
-    page = signed_in.get("/").text
+def test_status_chips_carry_a_label_not_only_a_colour(
+    client: TestClient, make_person, sign_in
+) -> None:
+    # An administrator is redirected to the portfolio, so sign in as somebody who lands on
+    # the overview itself.
+    sign_in(make_person("member@example.com", "Mo Member"))
+    page = client.get("/").text
 
     for state in STATES:
         assert f"chip--{state}" in page

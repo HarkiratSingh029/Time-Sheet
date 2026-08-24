@@ -148,10 +148,14 @@ def test_an_expired_cookie_is_rejected(settings: Settings) -> None:
     with TestClient(create_app(expiring)) as client:
         set_admin_password(client, GOOD_PASSWORD)
         sign_in(client)
-        assert client.get("/", follow_redirects=False).status_code == 200
+        # "/" redirects an administrator on to /dashboard, so assert on *where* it sends
+        # them rather than on the status code: signed in is anywhere but /login.
+        assert client.get("/", follow_redirects=False).headers.get("location") != "/login"
 
         time.sleep(2.1)
-        assert client.get("/", follow_redirects=False).status_code == 303
+        expired = client.get("/", follow_redirects=False)
+        assert expired.status_code == 303
+        assert expired.headers["location"] == "/login"
 
 
 def test_logout_clears_the_session(client: TestClient) -> None:
