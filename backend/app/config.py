@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     smtp_from: str = "ts-timesheets@localhost"
     digest_hour: int = 8
 
+    # Health thresholds. The semantics are fixed (docs/DATA_MODEL.md §4); the numbers a
+    # given organisation considers "nearly out of budget" are not.
+    health_amber_ratio: float = 0.90
+    health_amber_approval_days: int = 7
+    health_red_approval_days: int = 14
+
     @property
     def is_production(self) -> bool:
         return self.env == "production"
