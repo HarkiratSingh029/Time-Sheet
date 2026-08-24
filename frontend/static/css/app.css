@@ -799,3 +799,76 @@ code,
   display: inline-flex;
   gap: var(--space-1);
 }
+
+/* --- figures and meters --------------------------------------------------- */
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-4);
+}
+
+.figure {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+}
+
+.figure__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.figure__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text-heading);
+}
+
+.figure__of {
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.figure__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.meter {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+}
+
+.meter__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.meter__track {
+  height: 0.5rem;
+  background: var(--color-border);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.meter__fill {
+  height: 100%;
+  background: var(--color-tertiary);
+  border-radius: var(--radius-pill);
+}
+
+.meter__fill--over {
+  background: var(--color-state-rejected);
+}

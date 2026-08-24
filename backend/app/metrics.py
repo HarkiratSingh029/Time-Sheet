@@ -34,6 +34,7 @@ from backend.app.models import (
     Task,
     TimeNote,
     TimeNoteState,
+    User,
     as_utc,
     utcnow,
 )
@@ -255,6 +256,44 @@ def for_project(
         health=health,
         health_reasons=reasons,
     )
+
+
+@dataclass(frozen=True)
+class PersonHours:
+    """One consultant's contribution to a project, kept in the same four buckets."""
+
+    person: User
+    hours: Hours
+
+    @property
+    def logged(self) -> float:
+        return self.hours.logged
+
+
+def per_consultant(session: Session, project_id: int) -> list[PersonHours]:
+    """Who logged what, in one grouped query rather than one query per person."""
+    rows = session.execute(
+        select(
+            User,
+            _state_sum(TimeNoteState.DRAFT),
+            _state_sum(TimeNoteState.SUBMITTED),
+            _state_sum(TimeNoteState.APPROVED),
+            _state_sum(TimeNoteState.REJECTED),
+            _hours(case((Task.is_billable.is_(True), TimeNote.duration_minutes), else_=0)),
+            _hours(case((Task.is_billable.is_(False), TimeNote.duration_minutes), else_=0)),
+        )
+        .select_from(TimeNote)
+        .join(Task, Task.id == TimeNote.task_id)
+        .join(User, User.id == TimeNote.user_id)
+        .where(TimeNote.project_id == project_id)
+        .group_by(User.id)
+        .order_by(User.full_name)
+    ).all()
+
+    return [
+        PersonHours(person=row[0], hours=Hours(*(round(float(value), 2) for value in row[1:])))
+        for row in rows
+    ]
 
 
 def for_projects(

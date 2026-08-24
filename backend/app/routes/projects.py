@@ -12,6 +12,7 @@ from fastapi import APIRouter, Form, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 
+from backend.app import metrics
 from backend.app.access import (
     can_create_projects,
     can_manage,
@@ -134,13 +135,14 @@ async def create_project(
 
 @router.get("/{project_id}", response_class=HTMLResponse)
 async def project_detail(
-    request: Request, session: SessionDep, user: RequiredUser, project_id: int
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
 ):
     project = get_visible_project(session, user, project_id)
-    logged_minutes = (
-        session.scalar(select(TimeNote.duration_minutes).where(TimeNote.project_id == project.id))
-        or 0
-    )
+    figures = metrics.for_project(session, project, settings)
     return render(
         request,
         "projects/detail.html",
@@ -148,7 +150,10 @@ async def project_detail(
         project=project,
         manageable=can_manage(user, project),
         assignable=_assignable_people(session, project),
-        has_time_notes=bool(logged_minutes),
+        metrics=figures,
+        consultants=metrics.per_consultant(session, project.id),
+        recent_notes=_recent_notes(session, project),
+        has_time_notes=figures.hours.logged > 0,
     )
 
 
@@ -416,6 +421,18 @@ async def archive_task(
 
 def _people(session) -> list[User]:
     return list(session.scalars(select(User).where(User.is_active).order_by(User.full_name)).all())
+
+
+def _recent_notes(session, project: Project, limit: int = 10) -> list[TimeNote]:
+    """The last few entries, whoever logged them — the dashboard is the project's view."""
+    return list(
+        session.scalars(
+            select(TimeNote)
+            .where(TimeNote.project_id == project.id)
+            .order_by(TimeNote.work_date.desc(), TimeNote.id.desc())
+            .limit(limit)
+        ).all()
+    )
 
 
 def _assignable_people(session, project: Project) -> list[User]:
