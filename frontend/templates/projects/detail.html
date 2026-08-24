@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/_components.html" import state_chip, health_chip, figure, meter %}
 {% block title %}{{ project.code }} — TS Timesheets{% endblock %}
 
 {% block body %}
@@ -21,6 +22,64 @@
 </div>
 
 <div class="stack">
+  <section class="card">
+    <div class="page__header">
+      <div>
+        <h2 class="card__title">How it is going</h2>
+        <p class="card__meta">
+          {% if metrics.health_reasons %}
+            {{ metrics.health_reasons|join(' ') }}
+          {% else %}
+            On schedule and within budget.
+          {% endif %}
+        </p>
+      </div>
+      {{ health_chip(metrics.health, metrics.health_reasons) }}
+    </div>
+
+    <div class="figures">
+      {{ figure('Approved', metrics.hours.approved ~ 'h', hint='Signed off') }}
+      {{ figure('Awaiting approval', metrics.hours.awaiting_decision ~ 'h',
+                hint='Submitted, not yet decided') }}
+      {{ figure('Draft', metrics.hours.draft ~ 'h', hint='Not submitted') }}
+      {{ figure('Sent back', metrics.hours.rejected ~ 'h', hint='Needs correcting') }}
+      {{ figure('Logged in total', metrics.hours.logged ~ 'h',
+                hint='Every state — not a substitute for approved') }}
+      {{ figure('Billable', metrics.hours.billable ~ 'h',
+                hint=metrics.hours.non_billable ~ 'h non-billable') }}
+      {{ figure('Consultants', metrics.consultants, hint='People who have logged time') }}
+      {% if metrics.oldest_pending_days %}
+        {{ figure('Oldest approval', metrics.oldest_pending_days ~ 'd', hint='Waiting') }}
+      {% endif %}
+    </div>
+
+    <div class="figures" style="margin-top: var(--space-6)">
+      {% if metrics.budget_hours %}
+        {{ meter('Hour budget', metrics.budget_ratio,
+                 metrics.hours.logged ~ 'h of ' ~ metrics.budget_hours ~ 'h') }}
+      {% else %}
+        {{ figure('Hour budget', '—', hint='No budget set') }}
+      {% endif %}
+
+      {% if metrics.days_planned %}
+        {{ meter('Schedule', metrics.schedule_ratio,
+                 metrics.days_elapsed ~ ' of ' ~ metrics.days_planned ~ ' days') }}
+      {% else %}
+        {{ figure('Schedule', '—', hint='Open ended') }}
+      {% endif %}
+
+      {% if metrics.cost is not none %}
+        {{ figure('Cost burn', metrics.cost_burn if metrics.cost_burn is not none else '—',
+                  of=metrics.cost, hint='Pro rata on hours used') }}
+      {% endif %}
+
+      {% if project.proposed_duration_days %}
+        {{ figure('Completion', metrics.days_elapsed, of=project.proposed_duration_days,
+                  hint='Days elapsed against proposed duration') }}
+      {% endif %}
+    </div>
+  </section>
+
   <section class="card">
     <h2 class="card__title">Details</h2>
     <div class="table-wrap">
@@ -114,6 +173,77 @@
       {% else %}
         <p class="muted">Everyone is already on this project. <a href="/users/new">Invite someone</a>.</p>
       {% endif %}
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Who logged what</h2>
+    {% if consultants %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Person</th>
+              <th scope="col" class="numeric">Approved</th>
+              <th scope="col" class="numeric">Awaiting</th>
+              <th scope="col" class="numeric">Draft</th>
+              <th scope="col" class="numeric">Sent back</th>
+              <th scope="col" class="numeric">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in consultants %}
+              <tr>
+                <td>{{ entry.person.full_name or entry.person.email }}</td>
+                <td class="numeric">{{ entry.hours.approved }}h</td>
+                <td class="numeric">{{ entry.hours.awaiting_decision }}h</td>
+                <td class="numeric">{{ entry.hours.draft }}h</td>
+                <td class="numeric">{{ entry.hours.rejected }}h</td>
+                <td class="numeric"><strong>{{ entry.logged }}h</strong></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nobody has logged time on this project yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Recent timesheets</h2>
+    {% if recent_notes %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col">Person</th>
+              <th scope="col">Task</th>
+              <th scope="col" class="numeric">Hours</th>
+              <th scope="col">State</th>
+              <th scope="col"><span class="visually-hidden">History</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for note in recent_notes %}
+              <tr>
+                <td>{{ note.work_date.strftime('%a %d %b') }}</td>
+                <td>{{ note.user.full_name or note.user.email }}</td>
+                <td>{{ note.task.name }}</td>
+                <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+                <td>{{ state_chip(note.state) }}</td>
+                <td>
+                  <a class="button button--small"
+                     href="/projects/{{ project.id }}/notes/{{ note.id }}/history">History</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No time logged yet. <a href="/projects/{{ project.id }}/calendar">Open the calendar</a>.</p>
     {% endif %}
   </section>
 

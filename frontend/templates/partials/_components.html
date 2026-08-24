@@ -15,9 +15,38 @@
   </span>
 {%- endmacro %}
 
-{% macro health_chip(health) -%}
-  {%- set key = health|string -%}
-  <span class="chip chip--health-{{ key }}">
+{% macro health_chip(health, reasons=None) -%}
+  {%- set key = (health.value if health.value is defined else health)|string -%}
+  <span class="chip chip--health-{{ key }}"
+        {% if reasons %}title="{{ reasons|join(' ') }}"{% endif %}>
     <span class="chip__dot" aria-hidden="true"></span>{{ key|capitalize }}
   </span>
+{%- endmacro %}
+
+{# A figure with its label. `of` renders a denominator when there is one to show. #}
+{% macro figure(label, value, of=None, hint=None) -%}
+  <div class="figure">
+    <span class="figure__label">{{ label }}</span>
+    <span class="figure__value numeric">
+      {{ value }}{% if of %}<span class="figure__of"> / {{ of }}</span>{% endif %}
+    </span>
+    {% if hint %}<span class="figure__hint">{{ hint }}</span>{% endif %}
+  </div>
+{%- endmacro %}
+
+{# A proportion, shown as a bar and a percentage. Never used for approved-vs-logged. #}
+{% macro meter(label, ratio, caption) -%}
+  <div class="meter">
+    <div class="meter__head">
+      <span class="figure__label">{{ label }}</span>
+      <span class="numeric">{{ '%.0f'|format((ratio or 0) * 100) }}%</span>
+    </div>
+    <div class="meter__track"
+         role="img"
+         aria-label="{{ label }}: {{ '%.0f'|format((ratio or 0) * 100) }} percent">
+      <div class="meter__fill{{ ' meter__fill--over' if ratio and ratio > 1 else '' }}"
+           style="width: {{ [((ratio or 0) * 100), 100]|min }}%"></div>
+    </div>
+    <span class="figure__hint">{{ caption }}</span>
+  </div>
 {%- endmacro %}
