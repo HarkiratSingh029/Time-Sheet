@@ -49,6 +49,19 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def as_utc(moment: datetime | None) -> datetime | None:
+    """Read a stored timestamp back as UTC-aware.
+
+    SQLite has no timezone type, so `DateTime(timezone=True)` round-trips to a *naive*
+    datetime even though what was written was UTC. Attaching the zone at the boundary is
+    what keeps arithmetic honest — and stops an aware `utcnow()` from refusing to subtract
+    it (#47).
+    """
+    if moment is None:
+        return None
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=UTC)
+
+
 class Base(DeclarativeBase):
     pass
 
