@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import smtplib
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from email.message import EmailMessage
 
 from sqlalchemy import select
@@ -65,7 +65,7 @@ class Digest:
 __all__ = ["Digest", "build_digest", "pending_count", "send_daily_digests", "send_email"]
 
 
-def build_digest(session: Session, user: User, today: date | None = None) -> Digest | None:
+def build_digest(session: Session, user: User, now: datetime | None = None) -> Digest | None:
     """Only what is waiting on them personally — see `awaiting_this_person(strict=True)`."""
     notes = pending_for(session, user, Filters(), strict=True)
     if not notes:
@@ -78,7 +78,7 @@ def build_digest(session: Session, user: User, today: date | None = None) -> Dig
     lines = []
     for person, theirs in sorted(by_person.items()):
         hours = sum(note.duration_minutes for note in theirs) / 60
-        oldest = max(age_in_days(note, today) for note in theirs)
+        oldest = max(age_in_days(note, now) for note in theirs)
         entries = "entry" if len(theirs) == 1 else "entries"
         waited = "today" if oldest == 0 else f"waiting up to {oldest} days"
         lines.append(f"  - {person}: {len(theirs)} {entries}, {hours:g}h, {waited}")
@@ -86,7 +86,7 @@ def build_digest(session: Session, user: User, today: date | None = None) -> Dig
     return Digest(
         recipient=user,
         total=len(notes),
-        oldest_days=max(age_in_days(note, today) for note in notes),
+        oldest_days=max(age_in_days(note, now) for note in notes),
         lines=lines,
     )
 
@@ -132,7 +132,9 @@ def send_daily_digests(session: Session, settings: Settings, today: date | None 
         if user.digest_opt_out or user.digest_sent_on == today:
             continue
 
-        digest = build_digest(session, user, today)
+        # `today` stamps the once-a-day rule (a business date); the digest measures ages
+        # against stored UTC timestamps and uses the clock, not the calendar (#47).
+        digest = build_digest(session, user)
         if digest is None:
             continue
 

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -34,6 +34,8 @@ from backend.app.models import (
     Task,
     TimeNote,
     TimeNoteState,
+    as_utc,
+    utcnow,
 )
 
 MINUTES_PER_HOUR = 60
@@ -133,7 +135,10 @@ def consultants_on(session: Session, project_id: int) -> int:
     )
 
 
-def oldest_pending_approval_days(session: Session, project_id: int, today: date) -> int:
+def oldest_pending_approval_days(
+    session: Session, project_id: int, now: datetime | None = None
+) -> int:
+    """Elapsed time since the oldest still-undecided submission, in whole days."""
     oldest = session.scalar(
         select(func.min(TimeNote.submitted_at))
         .join(Approval, Approval.time_note_id == TimeNote.id)
@@ -143,9 +148,10 @@ def oldest_pending_approval_days(session: Session, project_id: int, today: date)
             Approval.decision == ApprovalDecision.PENDING.value,
         )
     )
+    oldest = as_utc(oldest)
     if oldest is None:
         return 0
-    return max(0, (today - oldest.date()).days)
+    return max(0, ((now or utcnow()) - oldest).days)
 
 
 def _schedule(project: Project, today: date) -> tuple[float | None, int, int | None]:
@@ -200,13 +206,20 @@ def derive_health(
 
 
 def for_project(
-    session: Session, project: Project, settings: Settings, today: date | None = None
+    session: Session,
+    project: Project,
+    settings: Settings,
+    today: date | None = None,
+    now: datetime | None = None,
 ) -> ProjectMetrics:
+    # Two clocks on purpose: `today` is a business date, for a schedule made of calendar
+    # dates. `now` is a timestamp, for ages measured against stored UTC timestamps. Mixing
+    # them is exactly the bug in #47.
     today = today or date.today()
 
     hours = hours_for(session, project.id)
     schedule_ratio, days_elapsed, days_planned = _schedule(project, today)
-    oldest_pending = oldest_pending_approval_days(session, project.id, today)
+    oldest_pending = oldest_pending_approval_days(session, project.id, now)
 
     budget_hours = project.billable_hours_budget
     budget_ratio = (
@@ -245,7 +258,12 @@ def for_project(
 
 
 def for_projects(
-    session: Session, projects: list[Project], settings: Settings, today: date | None = None
+    session: Session,
+    projects: list[Project],
+    settings: Settings,
+    today: date | None = None,
+    now: datetime | None = None,
 ) -> list[ProjectMetrics]:
     today = today or date.today()
-    return [for_project(session, project, settings, today) for project in projects]
+    now = now or utcnow()
+    return [for_project(session, project, settings, today, now) for project in projects]

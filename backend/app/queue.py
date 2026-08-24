@@ -12,13 +12,22 @@ asking the same question are not.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import NamedTuple
 
 from sqlalchemy import Select, and_, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
-from backend.app.models import Approval, ApprovalDecision, Project, TimeNote, TimeNoteState, User
+from backend.app.models import (
+    Approval,
+    ApprovalDecision,
+    Project,
+    TimeNote,
+    TimeNoteState,
+    User,
+    as_utc,
+    utcnow,
+)
 from backend.app.workflow import can_decide_anywhere
 
 # Matches the amber project-health threshold in docs/DATA_MODEL.md §4: the same number
@@ -95,10 +104,17 @@ def parse_filters(
     )
 
 
-def age_in_days(note: TimeNote, today: date | None = None) -> int:
-    if note.submitted_at is None:
+def age_in_days(note: TimeNote, now: datetime | None = None) -> int:
+    """How long an entry has waited, in elapsed 24-hour periods.
+
+    Timestamp to timestamp, never date to date. `submitted_at` is stored in UTC; comparing
+    it with `date.today()` — a local date — reads a day older than reality for most of the
+    day in most timezones, and that same figure moves a project's health threshold (#47).
+    """
+    submitted = as_utc(note.submitted_at)
+    if submitted is None:
         return 0
-    return max(0, ((today or date.today()) - note.submitted_at.date()).days)
+    return max(0, ((now or utcnow()) - submitted).days)
 
 
 def week_start(day: date) -> date:
