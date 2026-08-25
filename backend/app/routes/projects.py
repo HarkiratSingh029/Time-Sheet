@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Form, HTTPException, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 
-from backend.app import metrics
+from backend.app import metrics, storage
 from backend.app.access import (
     can_create_projects,
     can_manage,
@@ -28,6 +28,7 @@ from backend.app.models import (
     Approval,
     ApprovalDecision,
     Project,
+    ProjectFile,
     ProjectMember,
     ProjectStatus,
     Task,
@@ -151,6 +152,8 @@ async def project_detail(
         manageable=can_manage(user, project),
         assignable=_assignable_people(session, project),
         metrics=figures,
+        files=_files_of(session, project),
+        human_size=storage.human_size,
         consultants=metrics.per_consultant(session, project.id),
         recent_notes=_recent_notes(session, project),
         has_time_notes=figures.hours.logged > 0,
@@ -336,6 +339,82 @@ async def remove_member(
     return response
 
 
+# --- files ----------------------------------------------------------------------------
+
+
+@router.post("/{project_id}/files")
+async def upload_file(
+    session: SessionDep,
+    settings: SettingsDep,
+    user: RequiredUser,
+    project_id: int,
+    upload: UploadFile = File(...),
+):
+    """Any member may attach a document; managing the project is not the bar for it."""
+    project = get_visible_project(session, user, project_id)
+    response = RedirectResponse(f"/projects/{project.id}", status_code=status.HTTP_303_SEE_OTHER)
+
+    try:
+        stored = storage.save(
+            upload.file, upload.filename or "file", upload.content_type or "", settings, project.id
+        )
+    except storage.UploadError as error:
+        flash(response, settings, str(error), "error")
+        return response
+
+    session.add(
+        ProjectFile(
+            project_id=project.id,
+            uploaded_by_id=user.id,
+            filename=stored.display_name,
+            stored_name=stored.stored_name,
+            content_type=stored.content_type,
+            size_bytes=stored.size_bytes,
+        )
+    )
+    session.commit()
+
+    flash(response, settings, f"Attached {stored.display_name}.")
+    return response
+
+
+@router.get("/{project_id}/files/{file_id}")
+async def download_file(
+    session: SessionDep, settings: SettingsDep, user: RequiredUser, project_id: int, file_id: int
+):
+    """Served by the app, never by the web server: the volume has no idea who may read what."""
+    project = get_visible_project(session, user, project_id)
+    record = _file_of(session, project, file_id)
+
+    path = storage.path_of(settings, project.id, record.stored_name)
+    if not path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="That file is no longer on disk"
+        )
+
+    return FileResponse(
+        path,
+        media_type=record.content_type,
+        filename=record.filename,
+    )
+
+
+@router.post("/{project_id}/files/{file_id}/delete")
+async def delete_file(
+    session: SessionDep, settings: SettingsDep, user: RequiredUser, project_id: int, file_id: int
+):
+    project = get_manageable_project(session, user, project_id)
+    record = _file_of(session, project, file_id)
+
+    storage.delete(settings, project.id, record.stored_name)
+    session.delete(record)
+    session.commit()
+
+    response = RedirectResponse(f"/projects/{project.id}", status_code=status.HTTP_303_SEE_OTHER)
+    flash(response, settings, f"Removed {record.filename}.")
+    return response
+
+
 # --- tasks ----------------------------------------------------------------------------
 
 
@@ -421,6 +500,24 @@ async def archive_task(
 
 def _people(session) -> list[User]:
     return list(session.scalars(select(User).where(User.is_active).order_by(User.full_name)).all())
+
+
+def _files_of(session, project: Project) -> list[ProjectFile]:
+    return list(
+        session.scalars(
+            select(ProjectFile)
+            .where(ProjectFile.project_id == project.id)
+            .order_by(ProjectFile.created_at.desc(), ProjectFile.id.desc())
+        ).all()
+    )
+
+
+def _file_of(session, project: Project, file_id: int) -> ProjectFile:
+    record = session.get(ProjectFile, file_id)
+    if record is None or record.project_id != project.id:
+        # A file id from another project is a 404, not a peek at whether it exists.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    return record
 
 
 def _recent_notes(session, project: Project, limit: int = 10) -> list[TimeNote]:

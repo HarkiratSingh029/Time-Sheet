@@ -57,6 +57,11 @@ class Settings(BaseSettings):
 
     # Health thresholds. The semantics are fixed (docs/DATA_MODEL.md §4); the numbers a
     # given organisation considers "nearly out of budget" are not.
+    max_upload_mb: int = 25
+    allowed_upload_extensions: str = (
+        "pdf,png,jpg,jpeg,gif,csv,txt,md,doc,docx,xls,xlsx,ppt,pptx,zip"
+    )
+
     health_amber_ratio: float = 0.90
     health_amber_approval_days: int = 7
     health_red_approval_days: int = 14
@@ -68,6 +73,18 @@ class Settings(BaseSettings):
     @property
     def email_enabled(self) -> bool:
         return bool(self.smtp_host.strip())
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
+
+    @property
+    def upload_extensions(self) -> frozenset[str]:
+        return frozenset(
+            part.strip().lower().lstrip(".")
+            for part in self.allowed_upload_extensions.split(",")
+            if part.strip()
+        )
 
     @property
     def uploads_dir(self) -> Path:
