@@ -248,6 +248,63 @@
   </section>
 
   <section class="card">
+    <h2 class="card__title">Files</h2>
+    <p class="card__meta">
+      Documents that belong to this project — a statement of work, a signed timesheet, a
+      report. Stored on the server's own volume, and readable only by people who can open
+      this project.
+    </p>
+
+    {% if files %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">File</th>
+              <th scope="col" class="numeric">Size</th>
+              <th scope="col">Uploaded by</th>
+              <th scope="col">When</th>
+              {% if manageable %}<th scope="col"><span class="visually-hidden">Actions</span></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for file in files %}
+              <tr>
+                <td>
+                  <a href="/projects/{{ project.id }}/files/{{ file.id }}">{{ file.filename }}</a>
+                </td>
+                <td class="numeric">{{ human_size(file.size_bytes) }}</td>
+                <td>{{ file.uploaded_by.full_name or file.uploaded_by.email }}</td>
+                <td>{{ file.created_at.strftime('%d %b %Y') }}</td>
+                {% if manageable %}
+                  <td>
+                    <form method="post" action="/projects/{{ project.id }}/files/{{ file.id }}/delete">
+                      <button class="button button--small button--danger" type="submit">Remove</button>
+                    </form>
+                  </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nothing attached yet.</p>
+    {% endif %}
+
+    <form class="form" method="post" action="/projects/{{ project.id }}/files"
+          enctype="multipart/form-data" style="margin-top: var(--space-4)">
+      <label class="field">
+        <span class="field__label">Attach a file</span>
+        <input class="field__input" type="file" name="upload" required>
+      </label>
+      <div class="form__actions">
+        <button class="button button--primary" type="submit">Upload</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
     <h2 class="card__title">Tasks</h2>
     <p class="card__meta">Every time note is logged against one of these.</p>
 
