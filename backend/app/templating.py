@@ -35,7 +35,12 @@ def nav_items(path: str) -> list[dict[str, Any]]:
         {
             "label": label,
             "href": href,
-            "active": path == href or (href != "/" and path.startswith(href)),
+            # "/" redirects to /dashboard for anyone who may see it, so the Overview item
+            # has to light up on both. Pointing the nav straight at /dashboard would offer
+            # a link that 404s for everybody else.
+            "active": path == href
+            or (href == "/" and path == "/dashboard")
+            or (href != "/" and path.startswith(href)),
         }
         for label, href in NAV
     ]

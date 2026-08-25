@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -294,6 +294,157 @@ def per_consultant(session: Session, project_id: int) -> list[PersonHours]:
         PersonHours(person=row[0], hours=Hours(*(round(float(value), 2) for value in row[1:])))
         for row in rows
     ]
+
+
+WORKING_DAYS_PER_WEEK = 5
+STANDARD_DAY_HOURS = 8
+
+
+def working_days_between(first: date, last: date) -> int:
+    """Weekdays in an inclusive range. Public holidays are a per-country problem we do not
+    pretend to know; a consultant working a bank holiday is not an anomaly worth modelling."""
+    if last < first:
+        return 0
+    total_days = (last - first).days + 1
+    whole_weeks, remainder = divmod(total_days, 7)
+    days = whole_weeks * WORKING_DAYS_PER_WEEK
+    for offset in range(remainder):
+        if (first + timedelta(days=whole_weeks * 7 + offset)).weekday() < WORKING_DAYS_PER_WEEK:
+            days += 1
+    return days
+
+
+@dataclass(frozen=True)
+class Utilisation:
+    """One person's logged hours against the working hours available in a period."""
+
+    person: User
+    hours: Hours
+    available_hours: float
+
+    @property
+    def ratio(self) -> float | None:
+        if self.available_hours <= 0:
+            return None
+        return round(self.hours.logged / self.available_hours, 4)
+
+    @property
+    def billable_ratio(self) -> float | None:
+        if self.available_hours <= 0:
+            return None
+        return round(self.hours.billable / self.available_hours, 4)
+
+
+def utilisation_between(
+    session: Session, first: date, last: date, user_ids: list[int] | None = None
+) -> list[Utilisation]:
+    """Hours logged per person across every project, against the working days in the period."""
+    available = working_days_between(first, last) * STANDARD_DAY_HOURS
+
+    query = (
+        select(
+            User,
+            _state_sum(TimeNoteState.DRAFT),
+            _state_sum(TimeNoteState.SUBMITTED),
+            _state_sum(TimeNoteState.APPROVED),
+            _state_sum(TimeNoteState.REJECTED),
+            _hours(case((Task.is_billable.is_(True), TimeNote.duration_minutes), else_=0)),
+            _hours(case((Task.is_billable.is_(False), TimeNote.duration_minutes), else_=0)),
+        )
+        .select_from(TimeNote)
+        .join(Task, Task.id == TimeNote.task_id)
+        .join(User, User.id == TimeNote.user_id)
+        .where(TimeNote.work_date >= first, TimeNote.work_date <= last)
+        .group_by(User.id)
+        .order_by(User.full_name)
+    )
+    if user_ids is not None:
+        query = query.where(TimeNote.user_id.in_(user_ids))
+
+    return [
+        Utilisation(
+            person=row[0],
+            hours=Hours(*(round(float(value), 2) for value in row[1:])),
+            available_hours=float(available),
+        )
+        for row in session.execute(query).all()
+    ]
+
+
+@dataclass(frozen=True)
+class Portfolio:
+    """Every project the viewer may see, summarised."""
+
+    projects: list[ProjectMetrics]
+    utilisation: list[Utilisation]
+    period_first: date
+    period_last: date
+
+    @property
+    def counts(self) -> dict[Health, int]:
+        """Every project lands in exactly one bucket, so the counts always sum to the total."""
+        tally = dict.fromkeys(Health, 0)
+        for project in self.projects:
+            tally[project.health] += 1
+        return tally
+
+    @property
+    def total(self) -> int:
+        return len(self.projects)
+
+    @property
+    def deadlines(self) -> list[ProjectMetrics]:
+        """Projects still running, with an end date, nearest first."""
+        upcoming = [
+            metrics
+            for metrics in self.projects
+            if metrics.project.end_date is not None
+            and metrics.project.status not in COMPLETED_STATUSES
+        ]
+        return sorted(upcoming, key=lambda metrics: metrics.project.end_date)
+
+    @property
+    def ageing(self) -> list[ProjectMetrics]:
+        """Projects whose approvals have waited long enough to be somebody's problem."""
+        waiting = [metrics for metrics in self.projects if metrics.oldest_pending_days > 0]
+        return sorted(waiting, key=lambda metrics: -metrics.oldest_pending_days)
+
+    @property
+    def hours(self) -> Hours:
+        """The portfolio's hours, still in their four buckets."""
+        return Hours(
+            draft=round(sum(m.hours.draft for m in self.projects), 2),
+            submitted=round(sum(m.hours.submitted for m in self.projects), 2),
+            approved=round(sum(m.hours.approved for m in self.projects), 2),
+            rejected=round(sum(m.hours.rejected for m in self.projects), 2),
+            billable=round(sum(m.hours.billable for m in self.projects), 2),
+            non_billable=round(sum(m.hours.non_billable for m in self.projects), 2),
+        )
+
+
+def month_bounds(today: date) -> tuple[date, date]:
+    first = today.replace(day=1)
+    next_month = (first + timedelta(days=32)).replace(day=1)
+    return first, next_month - timedelta(days=1)
+
+
+def portfolio(
+    session: Session,
+    projects: list[Project],
+    settings: Settings,
+    today: date | None = None,
+    now: datetime | None = None,
+) -> Portfolio:
+    today = today or date.today()
+    now = now or utcnow()
+    first, last = month_bounds(today)
+
+    return Portfolio(
+        projects=for_projects(session, projects, settings, today, now),
+        utilisation=utilisation_between(session, first, last),
+        period_first=first,
+        period_last=last,
+    )
 
 
 def for_projects(

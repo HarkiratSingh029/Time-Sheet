@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import health_chip, figure, meter %}
+{% block title %}Overview — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>Overview</h1>
+    <p class="page__lede">
+      {{ portfolio.total }} project{{ '' if portfolio.total == 1 else 's' }} ·
+      utilisation for {{ portfolio.period_first.strftime('%B %Y') }}
+    </p>
+  </div>
+</div>
+
+{% if portfolio.total %}
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">Project health</h2>
+    <p class="card__meta">
+      Every project counted once. Derived from schedule, budget and how long approvals have
+      waited — never set by hand.
+    </p>
+    <div class="figures">
+      {% for state in ['green', 'amber', 'red'] %}
+        {% set count = portfolio.counts[state] %}
+        <a class="figure figure--link" href="#health-{{ state }}">
+          <span class="figure__label">{{ state|capitalize }}</span>
+          <span class="figure__value numeric">{{ count }}</span>
+          <span class="figure__hint">
+            {% if state == 'green' %}On schedule and within budget
+            {% elif state == 'amber' %}Nearly out of time, budget or patience
+            {% else %}Overdue, over budget, or approvals stalled{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+      {{ figure('Total', portfolio.total, hint='All projects you can see') }}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Hours across every project</h2>
+    <p class="card__meta">This month and every month — the same four buckets, never summed into one.</p>
+    <div class="figures">
+      {{ figure('Approved', portfolio.hours.approved ~ 'h', hint='Signed off') }}
+      {{ figure('Awaiting approval', portfolio.hours.awaiting_decision ~ 'h',
+                hint='Submitted, not yet decided') }}
+      {{ figure('Draft', portfolio.hours.draft ~ 'h', hint='Not submitted') }}
+      {{ figure('Sent back', portfolio.hours.rejected ~ 'h', hint='Needs correcting') }}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Upcoming deadlines</h2>
+    <p class="card__meta">Projects still running, nearest first.</p>
+    {% if portfolio.deadlines %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Project</th>
+              <th scope="col">Ends</th>
+              <th scope="col" class="numeric">Schedule</th>
+              <th scope="col" class="numeric">Budget</th>
+              <th scope="col">Health</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in portfolio.deadlines %}
+              <tr id="health-{{ item.health.value }}">
+                <td>
+                  <a href="/projects/{{ item.project.id }}"><code>{{ item.project.code }}</code></a>
+                  <br><span class="muted">{{ item.project.name }}</span>
+                </td>
+                <td>{{ item.project.end_date.strftime('%d %b %Y') }}</td>
+                <td class="numeric">
+                  {{ '%.0f%%'|format(item.schedule_ratio * 100) if item.schedule_ratio is not none else '—' }}
+                </td>
+                <td class="numeric">
+                  {{ '%.0f%%'|format(item.budget_ratio * 100) if item.budget_ratio is not none else '—' }}
+                </td>
+                <td>{{ health_chip(item.health, item.health_reasons) }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">No project has an end date yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Approvals waiting</h2>
+    <p class="card__meta">
+      Anything past {{ ageing_days }} days is marked — the same threshold the queue uses.
+    </p>
+    {% if portfolio.ageing %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Project</th>
+              <th scope="col" class="numeric">Oldest</th>
+              <th scope="col" class="numeric">Awaiting</th>
+              <th scope="col"><span class="visually-hidden">Queue</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in portfolio.ageing %}
+              <tr>
+                <td>
+                  <a href="/projects/{{ item.project.id }}"><code>{{ item.project.code }}</code></a>
+                </td>
+                <td class="numeric">
+                  {% if item.oldest_pending_days >= ageing_days %}
+                    <strong>{{ item.oldest_pending_days }}d</strong>
+                  {% else %}{{ item.oldest_pending_days }}d{% endif %}
+                </td>
+                <td class="numeric">{{ item.hours.awaiting_decision }}h</td>
+                <td>
+                  <a class="button button--small"
+                     href="/approvals?project_id={{ item.project.id }}">Open the queue</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nothing is waiting on an approver.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Utilisation</h2>
+    <p class="card__meta">
+      Hours logged against the working days in
+      {{ portfolio.period_first.strftime('%B') }} — {{ portfolio.period_first.strftime('%d %b') }}
+      to {{ portfolio.period_last.strftime('%d %b') }}. Weekends excluded; public holidays are
+      not modelled.
+    </p>
+    {% if portfolio.utilisation %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Person</th>
+              <th scope="col" class="numeric">Logged</th>
+              <th scope="col" class="numeric">Billable</th>
+              <th scope="col" class="numeric">Available</th>
+              <th scope="col" class="numeric">Utilisation</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in portfolio.utilisation %}
+              <tr>
+                <td>{{ entry.person.full_name or entry.person.email }}</td>
+                <td class="numeric">{{ entry.hours.logged }}h</td>
+                <td class="numeric">{{ entry.hours.billable }}h</td>
+                <td class="numeric">{{ '%g'|format(entry.available_hours) }}h</td>
+                <td class="numeric">
+                  {{ '%.0f%%'|format(entry.ratio * 100) if entry.ratio is not none else '—' }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nobody has logged time this month.</p>
+    {% endif %}
+  </section>
+</div>
+{% else %}
+  <section class="card">
+    <h2 class="card__title">No projects yet</h2>
+    <p class="card__meta">
+      Create one and the portfolio appears here.
+      <a href="/projects/new">New project</a>.
+    </p>
+  </section>
+{% endif %}
+{% endblock %}

@@ -872,3 +872,12 @@ code,
 .meter__fill--over {
   background: var(--color-state-rejected);
 }
+
+.figure--link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.figure--link:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-muted));
+}
