@@ -20,6 +20,7 @@ from backend.app.deps import NotAuthenticated, PasswordChangeRequired, RequiredU
 from backend.app.routes import approvals as approval_routes
 from backend.app.routes import auth as auth_routes
 from backend.app.routes import dashboard as dashboard_routes
+from backend.app.routes import exports as export_routes
 from backend.app.routes import projects as project_routes
 from backend.app.routes import timesheet as timesheet_routes
 from backend.app.routes import users as user_routes
@@ -88,6 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(auth_routes.router)
     app.include_router(dashboard_routes.router)
+    app.include_router(export_routes.router)
     app.include_router(approval_routes.router)
     app.include_router(project_routes.router)
     app.include_router(timesheet_routes.router)

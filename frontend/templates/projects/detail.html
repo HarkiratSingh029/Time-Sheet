@@ -15,6 +15,8 @@
   </div>
   <div class="form__actions">
     <a class="button button--primary" href="/projects/{{ project.id }}/calendar">Open calendar</a>
+    <a class="button" href="/exports/timesheet.csv?project_id={{ project.id }}">CSV</a>
+    <a class="button" href="/exports/projects/{{ project.id }}/report.pdf">PDF report</a>
     {% if manageable %}
       <a class="button" href="/projects/{{ project.id }}/edit">Edit project</a>
     {% endif %}

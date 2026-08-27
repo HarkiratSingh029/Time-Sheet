@@ -11,6 +11,9 @@
       utilisation for {{ portfolio.period_first.strftime('%B %Y') }}
     </p>
   </div>
+  {% if portfolio.total %}
+    <a class="button" href="/exports/timesheet.csv">Export CSV</a>
+  {% endif %}
 </div>
 
 {% if portfolio.total %}
