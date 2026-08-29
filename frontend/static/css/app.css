@@ -881,3 +881,22 @@ code,
 .figure--link:hover {
   background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-muted));
 }
+
+/* --- masthead search ------------------------------------------------------ */
+
+.masthead__search .field__input {
+  width: 12rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 48rem) {
+  .masthead__search {
+    order: 10;
+    flex-basis: 100%;
+  }
+
+  .masthead__search .field__input {
+    width: 100%;
+  }
+}
