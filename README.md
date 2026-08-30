@@ -133,5 +133,5 @@ Planning lives in **[docs/ROADMAP.md](docs/ROADMAP.md)**:
 
 - **EPIC 0 — Foundation. Complete.** Auth, users, projects, time notes on a calendar, a single approval, and a deployable container.
 - **EPIC 1 — Workflow & approvals. Complete.** User-defined roles, invitations, 1–5 sequenced approvers, the audit trail, notifications, and the week view.
-- **EPIC 2 — Insight. In progress.** Project and global dashboards, metrics, health, project files, exports.
-- **EPIC 3 — Operations.** Hardening, deployment, Cloudflare Tunnel, backups, admin tooling.
+- **EPIC 2 — Insight. Complete.** Metrics engine, project and global dashboards, files, CSV and PDF exports, search, and the consultant's own view.
+- **EPIC 3 — Operations. In progress.** Hardening, deployment, Cloudflare Tunnel, backups, CI and admin tooling.
