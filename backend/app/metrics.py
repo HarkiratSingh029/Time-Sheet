@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import case, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from backend.app.config import Settings
 from backend.app.models import (
@@ -426,6 +426,141 @@ def month_bounds(today: date) -> tuple[date, date]:
     first = today.replace(day=1)
     next_month = (first + timedelta(days=32)).replace(day=1)
     return first, next_month - timedelta(days=1)
+
+
+@dataclass(frozen=True)
+class ProjectHours:
+    """One person's hours on one project, in the usual four buckets."""
+
+    project: Project
+    hours: Hours
+
+
+@dataclass(frozen=True)
+class OwnTime:
+    """What one person did in a period, and what still needs them.
+
+    Everything here is the signed-in person's own. There is no user argument on the page
+    that renders it, so no permission can widen it into somebody else's timesheet.
+    """
+
+    person: User
+    period_first: date
+    period_last: date
+    by_project: list[ProjectHours]
+    sent_back: list[TimeNote]
+    stale_drafts: list[TimeNote]
+    submitted: list[TimeNote]
+
+    @property
+    def hours(self) -> Hours:
+        return Hours(
+            draft=round(sum(row.hours.draft for row in self.by_project), 2),
+            submitted=round(sum(row.hours.submitted for row in self.by_project), 2),
+            approved=round(sum(row.hours.approved for row in self.by_project), 2),
+            rejected=round(sum(row.hours.rejected for row in self.by_project), 2),
+            billable=round(sum(row.hours.billable for row in self.by_project), 2),
+            non_billable=round(sum(row.hours.non_billable for row in self.by_project), 2),
+        )
+
+    @property
+    def needs_attention(self) -> int:
+        return len(self.sent_back) + len(self.stale_drafts)
+
+
+def own_hours_by_project(
+    session: Session, user_id: int, first: date, last: date
+) -> list[ProjectHours]:
+    rows = session.execute(
+        select(
+            Project,
+            _state_sum(TimeNoteState.DRAFT),
+            _state_sum(TimeNoteState.SUBMITTED),
+            _state_sum(TimeNoteState.APPROVED),
+            _state_sum(TimeNoteState.REJECTED),
+            _hours(case((Task.is_billable.is_(True), TimeNote.duration_minutes), else_=0)),
+            _hours(case((Task.is_billable.is_(False), TimeNote.duration_minutes), else_=0)),
+        )
+        .select_from(TimeNote)
+        .join(Task, Task.id == TimeNote.task_id)
+        .join(Project, Project.id == TimeNote.project_id)
+        .where(
+            TimeNote.user_id == user_id,
+            TimeNote.work_date >= first,
+            TimeNote.work_date <= last,
+        )
+        .group_by(Project.id)
+        .order_by(Project.name)
+    ).all()
+
+    return [
+        ProjectHours(project=row[0], hours=Hours(*(round(float(v), 2) for v in row[1:])))
+        for row in rows
+    ]
+
+
+def own_time(
+    session: Session,
+    user: User,
+    today: date | None = None,
+    stale_after_days: int = 7,
+) -> OwnTime:
+    """This person's month, and the days still waiting on them.
+
+    A draft is "stale" once it is older than a week: long enough that it was probably meant
+    to be submitted and forgotten, short enough to still be correctable from memory.
+    """
+    today = today or date.today()
+    first, last = month_bounds(today)
+
+    def own(*extra):
+        return (
+            select(TimeNote)
+            .options(
+                selectinload(TimeNote.project),
+                selectinload(TimeNote.task),
+                selectinload(TimeNote.approvals).selectinload(Approval.approver),
+            )
+            .where(TimeNote.user_id == user.id, *extra)
+        )
+
+    sent_back = list(
+        session.scalars(
+            own(TimeNote.state == TimeNoteState.DRAFT)
+            .join(Approval, Approval.time_note_id == TimeNote.id)
+            .where(Approval.decision == ApprovalDecision.REJECTED)
+            .order_by(TimeNote.work_date.desc())
+            .distinct()
+        ).all()
+    )
+    sent_back_ids = {note.id for note in sent_back}
+
+    stale_drafts = [
+        note
+        for note in session.scalars(
+            own(
+                TimeNote.state == TimeNoteState.DRAFT,
+                TimeNote.work_date <= today - timedelta(days=stale_after_days),
+            ).order_by(TimeNote.work_date)
+        ).all()
+        if note.id not in sent_back_ids
+    ]
+
+    submitted = list(
+        session.scalars(
+            own(TimeNote.state == TimeNoteState.SUBMITTED).order_by(TimeNote.work_date)
+        ).all()
+    )
+
+    return OwnTime(
+        person=user,
+        period_first=first,
+        period_last=last,
+        by_project=own_hours_by_project(session, user.id, first, last),
+        sent_back=sent_back,
+        stale_drafts=stale_drafts,
+        submitted=submitted,
+    )
 
 
 def portfolio(

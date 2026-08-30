@@ -109,19 +109,23 @@ def test_every_page_template_extends_the_layout() -> None:
 # --- the design system ----------------------------------------------------------------
 
 
-def test_status_chips_carry_a_label_not_only_a_colour(
-    client: TestClient, make_person, sign_in
-) -> None:
-    # An administrator is redirected to the portfolio, so sign in as somebody who lands on
-    # the overview itself.
-    sign_in(make_person("member@example.com", "Mo Member"))
-    page = client.get("/").text
+def test_status_chips_carry_a_label_not_only_a_colour() -> None:
+    """Asserted against the macro itself.
+
+    Testing it through whichever page happens to render all four states makes the rule
+    hostage to that page's contents; the rule belongs to the component.
+    """
+    from backend.app.templating import templates
+
+    macros = templates.env.get_template("partials/_components.html").module
 
     for state in STATES:
-        assert f"chip--{state}" in page
-        assert state.capitalize() in page, (
+        markup = str(macros.state_chip(state))
+        assert f"chip--{state}" in markup
+        assert state.capitalize() in markup, (
             f"{state} must read as text, so it survives greyscale and colour blindness"
         )
+        assert "aria-hidden" in markup, "the colour dot is decoration, not information"
 
 
 def test_the_stylesheet_uses_tokens_rather_than_literal_colours() -> None:
