@@ -9,13 +9,13 @@ stories**.
 | --- | --- | --- | --- |
 | **EPIC 0** | Foundation — a running timesheet | [#2](https://github.com/HarkiratSingh029/Time-Sheet/issues/2) | **Complete** |
 | **EPIC 1** | Roles, permissions & the approval workflow | [#3](https://github.com/HarkiratSingh029/Time-Sheet/issues/3) | **Complete** |
-| **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | **In progress** |
-| **EPIC 3** | Operations — hardening, deployment & CI | [#5](https://github.com/HarkiratSingh029/Time-Sheet/issues/5) | Planned |
+| **EPIC 2** | Insight — dashboards, metrics & files | [#4](https://github.com/HarkiratSingh029/Time-Sheet/issues/4) | **Complete** |
+| **EPIC 3** | Operations — hardening, deployment & CI | [#5](https://github.com/HarkiratSingh029/Time-Sheet/issues/5) | **In progress** |
 
 Stories are promoted from a checklist on their epic to real issues when that epic starts —
 an issue opened four months before anyone reads it is a stale issue. EPIC 0's stories
-(#6–#12) and EPIC 1's (#21–#27) are merged; EPIC 2's are open as #38–#44. EPIC 3 remains a
-checklist.
+(#6–#12), EPIC 1's (#21–#27) and EPIC 2's (#38–#44) are merged; EPIC 3's are open as
+#55–#61. Every epic now has real tickets.
 
 ---
 
@@ -73,6 +73,10 @@ forward from EPIC 3 along the way, each on its own ticket.
 
 **Goal:** project owners see billability and project health without asking anyone.
 
+**Done.** 2.1 came first on purpose: every figure in the epic comes from one engine, so two
+screens cannot disagree about the same project. One defect surfaced mid-epic — #47, approval
+age computed across a UTC timestamp and a local date — and was fixed on its own ticket.
+
 | # | Issue | Story |
 | --- | --- | --- |
 | 2.1 | [#38](https://github.com/HarkiratSingh029/Time-Sheet/issues/38) | Metrics engine: hours, billability, burn, derived health |
@@ -90,15 +94,15 @@ forward from EPIC 3 along the way, each on its own ticket.
 **Goal:** running this on a small VPC is boring, which is the highest compliment a
 deployment can receive.
 
-| # | Story |
-| --- | --- |
-| 3.1 | Production compose and Cloudflare Tunnel, on by default |
-| 3.2 | Backup and restore of `data/` — one command each way |
-| 3.3 | Observability: structured logs, health and readiness endpoints, real error pages |
-| 3.4 | Security hardening: CSRF, rate limiting, session policy, password reset |
-| 3.5 | CI on GitHub Actions running every gate on each PR |
-| 3.6 | Performance pass: indexes, query review, calendar and dashboard load times |
-| 3.7 | Admin console: configuration, licence details, audit log viewer |
+| # | Issue | Story |
+| --- | --- | --- |
+| 3.1 | [#55](https://github.com/HarkiratSingh029/Time-Sheet/issues/55) | Production compose and Cloudflare Tunnel, on by default |
+| 3.2 | [#56](https://github.com/HarkiratSingh029/Time-Sheet/issues/56) | Backup and restore of `data/` — one command each way |
+| 3.3 | [#57](https://github.com/HarkiratSingh029/Time-Sheet/issues/57) | Observability: structured logs, health and readiness endpoints, real error pages |
+| 3.4 | [#58](https://github.com/HarkiratSingh029/Time-Sheet/issues/58) | Security hardening: CSRF, rate limiting, session policy, password reset |
+| 3.5 | [#59](https://github.com/HarkiratSingh029/Time-Sheet/issues/59) | CI on GitHub Actions running every gate on each PR |
+| 3.6 | [#60](https://github.com/HarkiratSingh029/Time-Sheet/issues/60) | Performance pass: indexes, query review, calendar and dashboard load times |
+| 3.7 | [#61](https://github.com/HarkiratSingh029/Time-Sheet/issues/61) | Admin console: configuration, licence details, audit log viewer |
 
 ---
 
@@ -110,6 +114,9 @@ EPIC 0 ──► EPIC 1 ──► EPIC 2
    └────────────────────┴──► EPIC 3
 ```
 
-EPIC 3 stories may be pulled forward when they unblock something: CI (3.1 aside, 3.5) is
-worth doing early, and security hardening lands before anything is exposed through a
-tunnel to the public internet.
+Two EPIC 3 items were already pulled forward when they unblocked something, each on its own
+ticket: Alembic migrations into #21, and the container's Python version in #32.
+
+Within EPIC 3 the suggested order is 3.5 first — so every later story is enforced rather
+than trusted — then 3.4, before anything is exposed through a public tunnel. 3.1 and 3.2
+belong together: a deployment without a tested restore has a single point of loss.
