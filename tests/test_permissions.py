@@ -339,3 +339,23 @@ def test_bulk_approve_is_refused_to_a_non_approver(client: TestClient, world, si
 
     with client.app.state.session_factory() as session:
         assert session.get(TimeNote, note_id).state is TimeNoteState.SUBMITTED
+
+
+# --- search ---------------------------------------------------------------------------
+
+
+def test_search_never_reveals_a_project_you_cannot_open(client: TestClient, world, sign_in) -> None:
+    """The whole point of the feature's scoping: a search box is not an enumeration oracle."""
+    sign_in(world["outsider"])
+    page = " ".join(client.get("/search?q=LEDGER").text.split())
+
+    assert "Ledger migration" not in page
+    assert "Nothing matched" in page
+
+    with_filter = " ".join(
+        client.get(f"/search?q=Discovery&project_id={world['project_id']}").text.split()
+    )
+    # The term itself is echoed into the search box, so assert on what would leak: the
+    # project's name, and a link to it.
+    assert "Ledger migration" not in with_filter, "a filter cannot widen the scope either"
+    assert f'/projects/{world["project_id"]}"' not in with_filter

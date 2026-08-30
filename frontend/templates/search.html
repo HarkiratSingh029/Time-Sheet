@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import state_chip %}
+{% block title %}Search — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>Search</h1>
+    <p class="page__lede">
+      Projects, people and time notes you can already see.
+    </p>
+  </div>
+</div>
+
+<form class="form filters" method="get" action="/search">
+  <label class="field" style="grid-column: 1 / -1">
+    <span class="field__label">Search</span>
+    <input class="field__input" type="search" name="q" value="{{ query }}"
+           placeholder="A project code, a person, or something from a time note"
+           autofocus>
+    <span class="field__hint">At least {{ minimum }} characters.</span>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Project</span>
+    <select class="field__select" name="project_id">
+      <option value="">All projects</option>
+      {% for project in projects %}
+        <option value="{{ project.id }}" {{ 'selected' if filters.project_id == project.id else '' }}>
+          {{ project.code }} — {{ project.name }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Person</span>
+    <select class="field__select" name="person_id">
+      <option value="">Everyone</option>
+      {% for person in people %}
+        <option value="{{ person.id }}" {{ 'selected' if filters.person_id == person.id else '' }}>
+          {{ person.full_name or person.email }}
+        </option>
+      {% endfor %}
+    </select>
+  </label>
+
+  <label class="field">
+    <span class="field__label">Worked from</span>
+    <input class="field__input" type="date" name="since"
+           value="{{ filters.since.isoformat() if filters.since else '' }}">
+  </label>
+
+  <label class="field">
+    <span class="field__label">Worked to</span>
+    <input class="field__input" type="date" name="until"
+           value="{{ filters.until.isoformat() if filters.until else '' }}">
+  </label>
+
+  <div class="form__actions">
+    <button class="button button--primary" type="submit">Search</button>
+    {% if query %}<a class="button button--ghost" href="/search">Clear</a>{% endif %}
+  </div>
+</form>
+
+{% if query and query|length < minimum %}
+  <p class="notice notice--info" role="status">
+    Type at least {{ minimum }} characters. A blank search would return everything, which
+    helps nobody.
+  </p>
+{% elif query %}
+  <p class="page__lede">
+    {{ results.total }} result{{ '' if results.total == 1 else 's' }} for
+    <strong>{{ results.query }}</strong>{% if results.truncated %}, showing the first
+    {{ limit }} of each kind{% endif %}.
+  </p>
+
+  {% if results.is_empty %}
+    <section class="card">
+      <h2 class="card__title">Nothing matched</h2>
+      <p class="card__meta">
+        Search only covers what you can already open, so a project you are not on will not
+        appear here.
+      </p>
+    </section>
+  {% endif %}
+
+  <div class="stack" data-search-results>
+    {% if results.projects %}
+      <section class="card">
+        <h2 class="card__title">Projects</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Name</th>
+                <th scope="col">Status</th>
+                <th scope="col">Dates</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for project in results.projects %}
+                <tr>
+                  <td><a href="/projects/{{ project.id }}"><code>{{ project.code }}</code></a></td>
+                  <td>{{ project.name }}</td>
+                  <td>{{ project.status.value|replace('_', ' ')|capitalize }}</td>
+                  <td>
+                    {{ project.start_date.strftime('%d %b %Y') }} –
+                    {{ project.end_date.strftime('%d %b %Y') if project.end_date else 'open ended' }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if results.people %}
+      <section class="card">
+        <h2 class="card__title">People</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Title</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for person in results.people %}
+                <tr>
+                  <td>{{ person.full_name }}</td>
+                  <td>{{ person.email }}</td>
+                  <td>{{ person.title or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+    {% if results.notes %}
+      <section class="card">
+        <h2 class="card__title">Time notes</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th scope="col">Day</th>
+                <th scope="col">Project</th>
+                <th scope="col">Person</th>
+                <th scope="col">Task</th>
+                <th scope="col" class="numeric">Hours</th>
+                <th scope="col">State</th>
+                <th scope="col">Detail</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for note in results.notes %}
+                <tr>
+                  <td>
+                    <a href="/projects/{{ note.project_id }}/notes/{{ note.id }}/history">
+                      {{ note.work_date.strftime('%d %b %Y') }}
+                    </a>
+                  </td>
+                  <td><a href="/projects/{{ note.project_id }}"><code>{{ note.project.code }}</code></a></td>
+                  <td>{{ note.user.full_name or note.user.email }}</td>
+                  <td>{{ note.task.name }}</td>
+                  <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+                  <td>{{ state_chip(note.state) }}</td>
+                  <td>{{ note.detail }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+  </div>
+{% endif %}
+{% endblock %}

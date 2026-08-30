@@ -45,6 +45,16 @@
           {% endif %}
 
           <div class="masthead__actions">
+            {% if user %}
+              <form class="masthead__search" method="get" action="/search" role="search">
+                <label>
+                  <span class="visually-hidden">Search projects, people and time notes</span>
+                  <input class="field__input" type="search" name="q" placeholder="Search"
+                         value="{{ query if query is defined else '' }}">
+                </label>
+              </form>
+            {% endif %}
+
             {% include "partials/_theme_toggle.html" %}
 
             {% if user %}
