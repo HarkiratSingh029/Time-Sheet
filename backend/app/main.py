@@ -21,6 +21,7 @@ from backend.app.routes import approvals as approval_routes
 from backend.app.routes import auth as auth_routes
 from backend.app.routes import dashboard as dashboard_routes
 from backend.app.routes import exports as export_routes
+from backend.app.routes import me as me_routes
 from backend.app.routes import projects as project_routes
 from backend.app.routes import search as search_routes
 from backend.app.routes import timesheet as timesheet_routes
@@ -29,7 +30,6 @@ from backend.app.routes.dashboard import can_see_portfolio
 from backend.app.scheduler import start as start_digests
 from backend.app.scheduler import stop as stop_digests
 from backend.app.seed import seed
-from backend.app.templating import render
 
 BRAND_DIR = REPO_ROOT / "brands" / "dist"
 STATIC_DIR = REPO_ROOT / "frontend" / "static"
@@ -91,6 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_routes.router)
     app.include_router(dashboard_routes.router)
     app.include_router(export_routes.router)
+    app.include_router(me_routes.router)
     app.include_router(search_routes.router)
     app.include_router(approval_routes.router)
     app.include_router(project_routes.router)
@@ -106,7 +107,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Whoever can see the portfolio lands on it; everyone else keeps the overview.
         if can_see_portfolio(user):
             return RedirectResponse("/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-        return render(request, "index.html", user=user)
+        # Everybody else lands on their own time, which is the question they actually have.
+        return RedirectResponse("/me", status_code=status.HTTP_303_SEE_OTHER)
 
     return app
 

@@ -336,7 +336,7 @@ def test_the_nav_never_offers_a_link_that_404s(
     page = flat(client.get("/"))
 
     assert '/dashboard"' not in page, "a consultant is not shown a door they cannot open"
-    assert client.get("/").status_code == 200, "and their own overview still works"
+    assert client.get("/").status_code == 200, "and their own time still loads"
 
 
 def test_a_portfolio_viewer_lands_on_the_dashboard(
@@ -349,13 +349,14 @@ def test_a_portfolio_viewer_lands_on_the_dashboard(
     assert landing.headers["location"] == "/dashboard"
 
 
-def test_a_consultant_keeps_their_own_overview(
+def test_a_consultant_is_sent_to_their_own_time_not_the_portfolio(
     client: TestClient, portfolio, make_person, sign_in
 ) -> None:
     sign_in(make_person("stays@example.com", "Stays Put"))
     landing = client.get("/", follow_redirects=False)
 
-    assert landing.status_code == 200
+    assert landing.status_code == 303
+    assert landing.headers["location"] == "/me", "their own question, not the portfolio's"
 
 
 def test_the_dashboard_requires_a_session(client: TestClient) -> None:

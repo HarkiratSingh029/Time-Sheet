@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% from "partials/_components.html" import figure %}
+{% block title %}My time — TS Timesheets{% endblock %}
+
+{% block body %}
+<div class="page__header">
+  <div>
+    <h1>My time</h1>
+    <p class="page__lede">
+      {{ mine.period_first.strftime('%B %Y') }} ·
+      {{ mine.person.full_name or mine.person.email }}
+    </p>
+  </div>
+  {% if awaiting_them %}
+    <a class="button" href="/approvals">
+      {{ awaiting_them }} waiting on your approval
+    </a>
+  {% endif %}
+</div>
+
+{% if mine.needs_attention %}
+  <section class="card">
+    <h2 class="card__title">Needs you</h2>
+
+    {% if mine.sent_back %}
+      <p class="card__meta">Days an approver sent back, with what they asked for.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col">Project</th>
+              <th scope="col" class="numeric">Hours</th>
+              <th scope="col">What was asked</th>
+              <th scope="col"><span class="visually-hidden">Fix it</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for note in mine.sent_back %}
+              {% set rejection = rejection_for(note) %}
+              <tr>
+                <td>{{ note.work_date.strftime('%a %d %b') }}</td>
+                <td><a href="/projects/{{ note.project_id }}"><code>{{ note.project.code }}</code></a></td>
+                <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+                <td>
+                  {% if rejection %}
+                    {{ rejection.comment }}
+                    <br><span class="muted">{{ rejection.approver.email }}</span>
+                  {% else %}<span class="muted">—</span>{% endif %}
+                </td>
+                <td>
+                  <a class="button button--small button--primary"
+                     href="/projects/{{ note.project_id }}/calendar?month={{ note.work_date.strftime('%Y-%m') }}">
+                    Correct it
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    {% if mine.stale_drafts %}
+      <p class="card__meta" style="margin-top: var(--space-4)">
+        Drafts more than a week old — probably meant to be submitted.
+      </p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col">Project</th>
+              <th scope="col">Task</th>
+              <th scope="col" class="numeric">Hours</th>
+              <th scope="col"><span class="visually-hidden">Open</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for note in mine.stale_drafts %}
+              <tr>
+                <td>{{ note.work_date.strftime('%a %d %b') }}</td>
+                <td><a href="/projects/{{ note.project_id }}"><code>{{ note.project.code }}</code></a></td>
+                <td>{{ note.task.name }}</td>
+                <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+                <td>
+                  <a class="button button--small"
+                     href="/projects/{{ note.project_id }}/calendar?month={{ note.work_date.strftime('%Y-%m') }}">
+                    Open
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+{% endif %}
+
+<div class="stack">
+  <section class="card">
+    <h2 class="card__title">This month</h2>
+    <p class="card__meta">
+      {{ mine.period_first.strftime('%d %b') }} to {{ mine.period_last.strftime('%d %b') }},
+      across every project.
+    </p>
+    <div class="figures">
+      {{ figure('Approved', mine.hours.approved ~ 'h', hint='Signed off') }}
+      {{ figure('Awaiting approval', mine.hours.submitted ~ 'h', hint='With an approver') }}
+      {{ figure('Draft', mine.hours.draft ~ 'h', hint='Not submitted yet') }}
+      {{ figure('Sent back', mine.hours.rejected ~ 'h', hint='Needs correcting') }}
+      {{ figure('Logged in total', mine.hours.logged ~ 'h',
+                hint='Every state — not a substitute for approved') }}
+      {{ figure('Billable', mine.hours.billable ~ 'h',
+                hint=mine.hours.non_billable ~ 'h non-billable') }}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">By project</h2>
+    {% if mine.by_project %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Project</th>
+              <th scope="col" class="numeric">Approved</th>
+              <th scope="col" class="numeric">Awaiting</th>
+              <th scope="col" class="numeric">Draft</th>
+              <th scope="col" class="numeric">Sent back</th>
+              <th scope="col" class="numeric">Total</th>
+              <th scope="col"><span class="visually-hidden">Calendar</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in mine.by_project %}
+              <tr>
+                <td>
+                  <a href="/projects/{{ row.project.id }}"><code>{{ row.project.code }}</code></a>
+                  <br><span class="muted">{{ row.project.name }}</span>
+                </td>
+                <td class="numeric">{{ row.hours.approved }}h</td>
+                <td class="numeric">{{ row.hours.submitted }}h</td>
+                <td class="numeric">{{ row.hours.draft }}h</td>
+                <td class="numeric">{{ row.hours.rejected }}h</td>
+                <td class="numeric"><strong>{{ row.hours.logged }}h</strong></td>
+                <td>
+                  <a class="button button--small"
+                     href="/projects/{{ row.project.id }}/calendar?month={{ mine.period_first.strftime('%Y-%m') }}">
+                    Calendar
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">
+        Nothing logged this month. Open a project and double-click a day on its calendar,
+        or use the week view to fill several at once.
+        <br><a href="/projects">Go to your projects</a>.
+      </p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2 class="card__title">Waiting on an approver</h2>
+    {% if mine.submitted %}
+      <p class="card__meta">Where each submitted day has reached in its approval chain.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col">Project</th>
+              <th scope="col" class="numeric">Hours</th>
+              <th scope="col">Chain</th>
+              <th scope="col"><span class="visually-hidden">History</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for note in mine.submitted %}
+              <tr>
+                <td>{{ note.work_date.strftime('%a %d %b') }}</td>
+                <td><a href="/projects/{{ note.project_id }}"><code>{{ note.project.code }}</code></a></td>
+                <td class="numeric">{{ '%g'|format(note.duration_minutes / 60) }}h</td>
+                <td>
+                  {% set decided = note.approvals|selectattr('decision.value', 'equalto', 'approved')|list|length %}
+                  {{ decided }} of {{ note.approvals|length }} approved
+                  {% for step in note.approvals|sort(attribute='sequence') %}
+                    {%- if step.decision.value == 'pending' and (loop.first or (note.approvals|sort(attribute='sequence'))[loop.index0 - 1].decision.value == 'approved') %}
+                      <br><span class="muted">with {{ step.approver.full_name or step.approver.email }}</span>
+                    {%- endif %}
+                  {% endfor %}
+                </td>
+                <td>
+                  <a class="button button--small"
+                     href="/projects/{{ note.project_id }}/notes/{{ note.id }}/history">History</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted">Nothing of yours is waiting on an approver.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
