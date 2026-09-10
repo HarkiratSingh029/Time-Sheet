@@ -71,6 +71,10 @@ carrying their reason:
 python3 -m backend.app.demo        # or add it to a database you already have
 ```
 
+The history is backdated rather than stamped at seed time, so the dashboards have
+something to derive from: projects carry real end dates, and one runs amber on approval
+lag instead of everything sitting green.
+
 Everyone it creates shares the password `demo-1234`, printed with the sign-in table when
 it finishes. It refuses to run on a database that already has projects.
 

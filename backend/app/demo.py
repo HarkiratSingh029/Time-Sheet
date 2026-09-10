@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 import sys
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from random import Random
 
 from sqlalchemy import select
@@ -32,6 +32,8 @@ from backend.app import workflow
 from backend.app.config import ConfigurationError, Settings, load_settings
 from backend.app.db import init_database, session_scope
 from backend.app.models import (
+    AuditAction,
+    AuditEvent,
     Permission,
     Project,
     ProjectMember,
@@ -56,6 +58,11 @@ OWNER_ROLE = "project owner"
 RNG_SEED = 20260910
 
 WEEKDAY_LOGGED_ODDS = 0.78
+
+# How far back an entry may still be waiting on someone. Kept just inside
+# `health_amber_approval_days`..`health_red_approval_days` so the dashboard shows a
+# project going amber on approval lag without every project going red.
+OLDEST_PENDING_DAYS = 12
 
 
 class DemoDataError(RuntimeError):
@@ -87,7 +94,7 @@ class ProjectSpec:
     billable_hours_budget: int
     proposed_duration_days: int
     starts_days_ago: int
-    ends_days_ago: int | None
+    ends_days_from_now: int | None
     required_approvals: int
     approvers: tuple[str, ...]
     consultants: tuple[str, ...]
@@ -114,7 +121,7 @@ PROJECTS: tuple[ProjectSpec, ...] = (
         billable_hours_budget=1_200,
         proposed_duration_days=180,
         starts_days_ago=84,
-        ends_days_ago=None,
+        ends_days_from_now=96,
         # The one project that needs two signatures, so the sequenced chain is visible.
         required_approvals=2,
         approvers=("daniel@example.com", "mei@example.com"),
@@ -165,7 +172,7 @@ PROJECTS: tuple[ProjectSpec, ...] = (
         billable_hours_budget=600,
         proposed_duration_days=120,
         starts_days_ago=56,
-        ends_days_ago=None,
+        ends_days_from_now=64,
         required_approvals=1,
         approvers=("mei@example.com",),
         consultants=("sofia@example.com", "ana@example.com"),
@@ -204,7 +211,7 @@ PROJECTS: tuple[ProjectSpec, ...] = (
         billable_hours_budget=300,
         proposed_duration_days=60,
         starts_days_ago=70,
-        ends_days_ago=21,
+        ends_days_from_now=-21,
         required_approvals=1,
         approvers=("daniel@example.com",),
         consultants=("tom@example.com", "ana@example.com"),
@@ -283,13 +290,16 @@ def _outcome(rng: Random, age_days: int, *, closed_project: bool) -> str:
     """
     if closed_project:
         return "approved"
-    if age_days > 21:
+    # Nothing older than this is left hanging. The oldest pending submission is what the
+    # health engine measures, so an unbounded backlog would paint every project red and
+    # the amber/green distinction would never appear.
+    if age_days > OLDEST_PENDING_DAYS:
         return "approved"
     if age_days > 7:
         roll = rng.random()
-        if roll < 0.74:
+        if roll < 0.62:
             return "approved"
-        if roll < 0.90:
+        if roll < 0.88:
             return "submitted"
         return "rejected"
     roll = rng.random()
@@ -300,6 +310,43 @@ def _outcome(rng: Random, age_days: int, *, closed_project: bool) -> str:
     return "rejected"
 
 
+def _evening_of(day: date, rng: Random) -> datetime:
+    """A plausible moment to have pressed the button, rather than midnight."""
+    return datetime.combine(day, time(hour=17, minute=rng.randrange(0, 60)), tzinfo=UTC)
+
+
+def _backdate(
+    session: Session,
+    note: TimeNote,
+    *,
+    submitted: datetime,
+    decisions: list[datetime],
+) -> None:
+    """Move the transitions that just happened into the past.
+
+    `submit()` and `approve()` stamp `utcnow()`, so a freshly seeded database claims every
+    entry was sent for approval this second. `oldest_pending_approval_days()` then reports
+    zero on every project and the health engine has nothing to work with — three green
+    tiles that would stay green whatever the data said.
+
+    Audit rows are append-only once written, so they are adjusted here while still pending
+    in the session; touching them after a flush would trip the tamper guard in `seed.py`.
+    """
+    # A rejection clears submitted_at. Leave it cleared.
+    if note.submitted_at is not None:
+        note.submitted_at = submitted
+
+    settled = [row for row in sorted(note.approvals, key=lambda r: r.sequence) if row.decided_at]
+    for approval, decided in zip(settled, decisions, strict=False):
+        approval.decided_at = decided
+
+    last = decisions[-1] if decisions else submitted
+    for pending in session.new:
+        if not isinstance(pending, AuditEvent) or pending.time_note_id != note.id:
+            continue
+        pending.occurred_at = submitted if pending.action is AuditAction.SUBMITTED else last
+
+
 def _drive(
     session: Session,
     note: TimeNote,
@@ -307,10 +354,14 @@ def _drive(
     approvers: list[User],
     outcome: str,
     rng: Random,
+    as_of: date,
 ) -> None:
-    """Walk one note to its outcome using the real transitions."""
+    """Walk one note to its outcome using the real transitions, then age it."""
     if outcome == "draft":
         return
+
+    # Sent for approval the evening of the day after the work, never in the future.
+    sent_on = min(note.work_date + timedelta(days=1), as_of)
 
     workflow.submit(session, note, author)
     # submit() inserts the approval rows by foreign key, so the collection this note
@@ -318,16 +369,29 @@ def _drive(
     # each one gets a fresh session — but this script drives the whole chain in one.
     session.expire(note, ["approvals"])
     if outcome == "submitted":
+        _backdate(session, note, submitted=_evening_of(sent_on, rng), decisions=[])
         return
 
     if outcome == "rejected":
         # A rejection lands the note back in draft with the reason attached — that is the
         # product's behaviour, not a `rejected` row sitting in the table.
         workflow.reject(session, approvers[0], note, rng.choice(REJECTION_COMMENTS))
+        _backdate(
+            session,
+            note,
+            submitted=_evening_of(sent_on, rng),
+            decisions=[_evening_of(min(sent_on + timedelta(days=1), as_of), rng)],
+        )
         return
 
+    decided_on = sent_on
+    decisions: list[datetime] = []
     for approver in approvers:
         workflow.approve(session, approver, note)
+        # Each signature in the chain costs another day or two of waiting.
+        decided_on = min(decided_on + timedelta(days=rng.randint(1, 3)), as_of)
+        decisions.append(_evening_of(decided_on, rng))
+    _backdate(session, note, submitted=_evening_of(sent_on, rng), decisions=decisions)
 
 
 def build_demo(session: Session, settings: Settings, *, as_of: date) -> dict[str, int]:
@@ -363,7 +427,11 @@ def build_demo(session: Session, settings: Settings, *, as_of: date) -> dict[str
 
     for spec in PROJECTS:
         start = as_of - timedelta(days=spec.starts_days_ago)
-        end = None if spec.ends_days_ago is None else as_of - timedelta(days=spec.ends_days_ago)
+        end = (
+            None
+            if spec.ends_days_from_now is None
+            else as_of + timedelta(days=spec.ends_days_from_now)
+        )
         owner = people["priya@example.com"]
 
         project = Project(
@@ -443,6 +511,7 @@ def build_demo(session: Session, settings: Settings, *, as_of: date) -> dict[str
                     approvers,
                     _outcome(rng, (as_of - day).days, closed_project=closed),
                     rng,
+                    as_of,
                 )
 
     session.flush()

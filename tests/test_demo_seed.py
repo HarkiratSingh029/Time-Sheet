@@ -7,14 +7,21 @@ reason, nothing logged outside its project's window — rather than about row co
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, time
 
 import pytest
 from sqlalchemy import select
 
 from backend.app.config import Settings
 from backend.app.db import init_database
-from backend.app.demo import DEMO_PASSWORD, PEOPLE, DemoDataError, build_demo
+from backend.app.demo import (
+    DEMO_PASSWORD,
+    OLDEST_PENDING_DAYS,
+    PEOPLE,
+    DemoDataError,
+    build_demo,
+)
+from backend.app.metrics import oldest_pending_approval_days
 from backend.app.models import (
     Approval,
     ApprovalDecision,
@@ -24,6 +31,7 @@ from backend.app.models import (
     TimeNote,
     TimeNoteState,
     User,
+    as_utc,
 )
 from backend.app.security import verify_password
 from backend.app.workflow import latest_rejection
@@ -142,3 +150,44 @@ def test_it_refuses_to_overwrite_an_existing_database(demo, settings: Settings):
     demo.rollback()
     assert demo.scalar(select(Approval).limit(1)) is not None
     assert before is not None
+
+
+def test_history_is_dated_in_the_past_not_at_seed_time(demo):
+    """submit() stamps utcnow(); a demo that keeps that has no approval age to report."""
+    submitted = [
+        note for note in demo.scalars(select(TimeNote)).all() if note.submitted_at is not None
+    ]
+    assert submitted
+
+    for note in submitted:
+        sent = as_utc(note.submitted_at).date()
+        # Sent after the work happened, and never later than the day the seed ran for.
+        assert note.work_date <= sent <= AS_OF
+
+    for note in submitted:
+        for approval in note.approvals:
+            if approval.decided_at is not None:
+                assert as_utc(approval.decided_at) >= as_utc(note.submitted_at)
+
+
+def test_the_pending_queue_stays_inside_the_amber_window(demo, settings: Settings):
+    """Bounded on purpose: an unbounded backlog paints every project red."""
+    for project in demo.scalars(select(Project)).all():
+        waiting = oldest_pending_approval_days(
+            demo, project.id, now=datetime.combine(AS_OF, time(23, 59), tzinfo=UTC)
+        )
+        assert waiting <= OLDEST_PENDING_DAYS
+        assert waiting < settings.health_red_approval_days
+
+
+def test_the_running_projects_have_a_deadline_to_show(demo):
+    """The dashboard's upcoming-deadlines panel needs an open project with an end date."""
+    running = [
+        project
+        for project in demo.scalars(select(Project)).all()
+        if project.status is ProjectStatus.ACTIVE
+    ]
+    assert running
+    for project in running:
+        assert project.end_date is not None
+        assert project.end_date > AS_OF
