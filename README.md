@@ -61,6 +61,19 @@ API docs at `/api/docs` (development only).
 `./scripts/dev.sh --fresh` wipes `data/` first — a half-migrated local database is a worse
 debugging experience than losing a throwaway one.
 
+A first start gives you the administrator and nothing else. For something to actually look
+at — seven people, three projects and roughly two months of time notes spread across draft,
+submitted and approved, with a two-approver chain on one project and a few rejections
+carrying their reason:
+
+```bash
+./scripts/dev.sh --fresh --demo    # wipe, reseed, add demo data, serve
+python3 -m backend.app.demo        # or add it to a database you already have
+```
+
+Everyone it creates shares the password `demo-1234`, printed with the sign-in table when
+it finishes. It refuses to run on a database that already has projects.
+
 Doing it by hand instead:
 
 ```bash

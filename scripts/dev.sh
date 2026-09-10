@@ -3,6 +3,7 @@
 #
 #   ./scripts/dev.sh            # run with reload on http://127.0.0.1:8000
 #   ./scripts/dev.sh --fresh    # wipe data/, rebuild brand artifacts, reseed, then run
+#   ./scripts/dev.sh --demo     # also fill the database with demo data to click through
 #
 # --fresh exists because a half-migrated local database is a worse debugging
 # experience than losing a throwaway one.
@@ -13,9 +14,11 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 FRESH=false
+DEMO=false
 for arg in "$@"; do
   case "$arg" in
     --fresh) FRESH=true ;;
+    --demo) DEMO=true ;;
     -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
     *) echo "unknown flag: $arg" >&2; exit 2 ;;
   esac
@@ -54,6 +57,12 @@ The platform is set up (gates, tokens, docs, skills); the app itself is EPIC 0,
 story 0.1. See docs/ROADMAP.md.
 EOF
   exit 1
+fi
+
+if [[ "$DEMO" == true ]]; then
+  echo "==> seeding demo data"
+  # Non-empty database: say so and carry on serving, rather than failing the launch.
+  python3 -m backend.app.demo || true
 fi
 
 echo "==> starting TS Timesheets on http://127.0.0.1:8000"
