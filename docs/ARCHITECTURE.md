@@ -119,6 +119,7 @@ worse debugging experience than losing a throwaway one.
 ```bash
 ./scripts/dev.sh                 # local dev, reload on
 ./scripts/dev.sh --fresh         # wipe data/, reseed, then run
+./scripts/dev.sh --fresh --demo  # ... and fill it with demo data to click through
 docker compose up --build        # container launch
 docker compose down -v && docker compose up --build   # fresh container launch
 ```
